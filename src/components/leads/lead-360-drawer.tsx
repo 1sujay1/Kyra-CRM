@@ -83,21 +83,19 @@ export function Lead360Drawer({
   onUpdateLead,
   onOpenStatusModal,
 }: Lead360DrawerProps) {
-  if (!lead) return null;
-
   const [activeTab, setActiveTab] = useState<'timeline' | 'edit' | 'add_activity' | 'schedule_visit'>('timeline');
 
   // Edit form state
   const [formData, setFormData] = useState({
-    full_name: lead.full_name,
-    phone: lead.phone,
-    email: lead.email,
-    city: lead.city,
-    project_name: lead.project_name,
-    budget_range: lead.budget_range,
-    purpose: lead.purpose,
-    quality: lead.quality,
-    assigned_to_name: lead.assigned_to_name,
+    full_name: lead?.full_name || '',
+    phone: lead?.phone || '',
+    email: lead?.email || '',
+    city: lead?.city || '',
+    project_name: lead?.project_name || '',
+    budget_range: lead?.budget_range || '',
+    purpose: lead?.purpose || 'farmhouse',
+    quality: lead?.quality || 'warm',
+    assigned_to_name: lead?.assigned_to_name || '',
   });
 
   // New activity state
@@ -131,6 +129,8 @@ export function Lead360Drawer({
       });
     }
   }, [lead]);
+
+  if (!lead) return null;
 
   const handleSaveDetails = (e: React.FormEvent) => {
     e.preventDefault();

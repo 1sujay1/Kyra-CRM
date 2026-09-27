@@ -41,20 +41,30 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh auth token if expired
-  const { data: { user } } = await supabase.auth.getUser();
+  // 1. Check Supabase auth session
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+  } catch {
+    user = null;
+  }
+
+  // 2. Check Kyra CRM verified session cookie
+  const kyraUsername = request.cookies.get('kyra_username')?.value;
+  const isAuthenticated = Boolean(user || kyraUsername);
 
   // Protect dashboard routes
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login');
   const isApiRoute = request.nextUrl.pathname.startsWith('/api');
 
-  if (!user && !isAuthRoute && !isApiRoute && request.nextUrl.pathname !== '/') {
+  if (!isAuthenticated && !isAuthRoute && !isApiRoute && request.nextUrl.pathname !== '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  if (isAuthenticated && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/leads';
     return NextResponse.redirect(url);

@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 import { UserRole } from '@/types/database.types';
 
+import { logoutAction } from '@/lib/auth/actions';
+
 interface HeaderProps {
   userName?: string;
   userEmail?: string;
@@ -31,12 +33,13 @@ export function Header({
 
   const handleSignOut = async () => {
     try {
+      await logoutAction();
       const supabase = createClient();
       await supabase.auth.signOut();
     } catch {
       // ignore
     }
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   return (

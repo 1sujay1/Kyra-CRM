@@ -412,15 +412,38 @@ export default function LeadsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLeads.map((lead) => {
-                const isRevealed = revealedPhones[lead.id];
-                return (
-                  <TableRow
-                    key={lead.id}
-                    onClick={() => handleOpen360(lead)}
-                    className="hover:bg-slate-50/70 transition-colors cursor-pointer"
-                  >
-                    {/* Buyer details without DPDP text */}
+              {filteredLeads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-16 text-muted-foreground text-xs">
+                    <div className="flex flex-col items-center justify-center gap-2.5">
+                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                        <Users className="h-5 w-5" />
+                      </div>
+                      <p className="font-bold text-slate-800 text-sm">No Leads in Pipeline</p>
+                      <p className="text-slate-500 max-w-sm">
+                        Preloaded demo leads have been removed. Click &quot;+ New Lead&quot; to register your first real farmland buyer enquiry or receive incoming ad leads.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => setNewLeadModalOpen(true)}
+                        className="mt-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ New Lead</span>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredLeads.map((lead) => {
+                  const isRevealed = revealedPhones[lead.id];
+                  return (
+                    <TableRow
+                      key={lead.id}
+                      onClick={() => handleOpen360(lead)}
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer"
+                    >
+                      {/* Buyer details without DPDP text */}
                     <TableCell>
                       <div>
                         <div className="font-semibold text-sm text-foreground hover:text-emerald-700 transition-colors">
@@ -544,7 +567,7 @@ export default function LeadsPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
+              }))}
             </TableBody>
           </Table>
         )}

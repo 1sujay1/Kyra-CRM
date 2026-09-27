@@ -261,13 +261,3 @@ grant all on leads to authenticated;
 grant all on activities to authenticated;
 grant all on lead_status_history to authenticated;
 grant all on audit_logs to authenticated;
-
--- 11. SEED CONFIDENTIAL INITIAL LEADS (Directly in Supabase DB)
-insert into leads (id, full_name, phone, email, city, project_name, source, campaign_name, budget_range, purpose, status, quality, assigned_to_name)
-values
-  ('11111111-1111-1111-1111-111111111111', 'Karthik Subramanian', '+919842145620', 'karthik.subramanian@gmail.com', 'Coimbatore (RS Puram)', 'Anaikatti Green Acres', 'meta', 'Coimbatore_Foothills_Farmplots_Q3', '₹35L - ₹50L', 'farmhouse', 'site_visit_scheduled', 'hot', 'Priya Raman'),
-  ('22222222-2222-2222-2222-222222222222', 'Dr. Rajesh Natarajan', '+919443218765', 'dr.rajesh.n@yahoo.com', 'Tiruppur', 'Pollachi Coconut Groves', 'google', 'Search_Farmlands_Pollachi_Road', '₹50L - ₹75L', 'agriculture', 'qualified', 'hot', 'Vignesh Kumar'),
-  ('33333333-3333-3333-3333-333333333333', 'Ananya Sundaram', '+919789012345', 'ananya.sundaram@techcorp.in', 'Bengaluru / Coimbatore', 'Siruvani Valley Estates', 'meta', 'Siruvani_Valley_Farmlands_Retargeting', '₹25L - ₹35L', 'investment', 'new', 'warm', 'Priya Raman'),
-  ('44444444-4444-4444-4444-444444444444', 'Murugesan Palanisamy', '+919865432109', 'pmurugan1974@gmail.com', 'Pollachi', 'Pollachi Coconut Groves', 'walk_in', null, '₹75L+', 'agriculture', 'contacted', 'warm', 'Vignesh Kumar'),
-  ('55555555-5555-5555-5555-555555555555', 'Vikram Chandrasekar', '+919940123456', 'vikram.c@finvest.com', 'Chennai / Coimbatore', 'Anaikatti Green Acres', 'google', 'Search_Farmland_Plots_Coimbatore', '₹40L - ₹60L', 'farmhouse', 'booked', 'hot', 'Priya Raman')
-on conflict (id) do nothing;

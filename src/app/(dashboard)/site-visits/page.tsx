@@ -225,51 +225,51 @@ export default function SiteVisitsPage() {
       </div>
 
       {/* TOP REPORT METRICS CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl">
-              <CalendarCheck className="h-5 w-5" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <Card className="bg-white border-slate-200 shadow-xs">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-700 rounded-xl shrink-0">
+              <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Scheduled Tours</p>
-              <h4 className="text-xl font-bold text-slate-900 mt-0.5">{scheduledCount}</h4>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-emerald-100 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Completed Visits</p>
-              <h4 className="text-xl font-bold text-emerald-700 mt-0.5">{completedCount}</h4>
+            <div className="min-w-0">
+              <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">Scheduled</p>
+              <h4 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">{scheduledCount}</h4>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border-amber-100 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl">
-              <Sparkles className="h-5 w-5" />
+        <Card className="bg-white border-emerald-100 shadow-xs">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 bg-emerald-50 text-emerald-700 rounded-xl shrink-0">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Hot / Booked Interest</p>
-              <h4 className="text-xl font-bold text-amber-700 mt-0.5">{hotInterestedCount}</h4>
+            <div className="min-w-0">
+              <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">Completed</p>
+              <h4 className="text-lg sm:text-xl font-bold text-emerald-700 mt-0.5">{completedCount}</h4>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white border-indigo-100 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
-              <Car className="h-5 w-5" />
+        <Card className="bg-white border-amber-100 shadow-xs">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 bg-amber-50 text-amber-700 rounded-xl shrink-0">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Coimbatore Pickups</p>
-              <h4 className="text-xl font-bold text-indigo-700 mt-0.5">{airportPickupsCount}</h4>
+            <div className="min-w-0">
+              <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">Hot / Booked</p>
+              <h4 className="text-lg sm:text-xl font-bold text-amber-700 mt-0.5">{hotInterestedCount}</h4>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white border-indigo-100 shadow-xs">
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-700 rounded-xl shrink-0">
+              <Car className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">CBE Pickups</p>
+              <h4 className="text-lg sm:text-xl font-bold text-indigo-700 mt-0.5">{airportPickupsCount}</h4>
             </div>
           </CardContent>
         </Card>

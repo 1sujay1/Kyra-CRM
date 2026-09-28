@@ -1,5 +1,4 @@
-import { AppSidebar } from '@/components/layout/app-sidebar';
-import { Header } from '@/components/layout/header';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { SessionTimeoutProvider } from '@/components/layout/session-timeout-provider';
 import { getCurrentUserAction } from '@/lib/auth/actions';
 import { UserRole } from '@/types/database.types';
@@ -18,18 +17,14 @@ export default async function DashboardLayout({
 
   return (
     <SessionTimeoutProvider timeoutMinutes={480}>
-      <div className="min-h-screen bg-slate-50/50 flex">
-        <AppSidebar userRole={userRole} />
-        <div className="flex-1 flex flex-col pl-64">
-          <Header
-            userName={userName}
-            userEmail={userEmail}
-            userRole={userRole}
-            orgName={orgName}
-          />
-          <main className="flex-1 p-8 overflow-y-auto">{children}</main>
-        </div>
-      </div>
+      <DashboardShell
+        userName={userName}
+        userEmail={userEmail}
+        userRole={userRole}
+        orgName={orgName}
+      >
+        {children}
+      </DashboardShell>
     </SessionTimeoutProvider>
   );
 }

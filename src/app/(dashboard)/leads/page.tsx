@@ -383,85 +383,85 @@ export default function LeadsPage() {
       </div>
 
       {/* MODERN ANIMATED STATS BOXES */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Card 1: Total Leads */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Active Leads
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Total Leads
             </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
-              <Users className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-slate-900">
               {leads.length}
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-xs font-medium text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{leads.filter((l) => l.quality === 'hot').length} Hot priority buyers</span>
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] sm:text-xs font-medium text-emerald-700 truncate">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="truncate">{leads.filter((l) => l.quality === 'hot').length} Hot priority</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: Meta Campaigns */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-400" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Meta Campaigns
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Meta Ads
             </span>
-            <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-mono">
-              Active Ads
+            <Badge variant="outline" className="text-[9px] sm:text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-mono px-1.5 py-0.5">
+              Active
             </Badge>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-slate-900">
               {leads.filter((l) => l.source === 'meta').length}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Anaikatti & Siruvani buyers</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-1 truncate">Anaikatti & Siruvani</p>
           </div>
         </div>
 
         {/* Card 3: Google Search Ads */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-400" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Google Search Ads
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Google Ads
             </span>
-            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-mono">
-              High Intent
+            <Badge variant="outline" className="text-[9px] sm:text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-mono px-1.5 py-0.5">
+              Intent
             </Badge>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-slate-900">
               {leads.filter((l) => l.source === 'google').length}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Pollachi & Coimbatore search</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-1 truncate">Pollachi & CBE Search</p>
           </div>
         </div>
 
         {/* Card 4: Site Visits Booked */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-purple-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-purple-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Site Visits Booked
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Site Visits
             </span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:scale-110 transition-transform">
-              <CalendarCheck className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-purple-50 text-purple-700 group-hover:scale-110 transition-transform">
+              <CalendarCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-purple-900">
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-purple-900">
               {leads.filter((l) => l.status === 'site_visit_scheduled' || l.status === 'site_visit_completed').length}
             </div>
-            <div className="flex items-center justify-between text-xs text-purple-700 mt-1 font-medium">
-              <span>Coimbatore Foothills & Pollachi</span>
-              <ArrowUpRight className="h-3.5 w-3.5" />
+            <div className="flex items-center justify-between text-[11px] sm:text-xs text-purple-700 mt-1 font-medium truncate">
+              <span className="truncate">Tours booked</span>
+              <ArrowUpRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
             </div>
           </div>
         </div>

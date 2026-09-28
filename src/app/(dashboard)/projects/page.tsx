@@ -133,83 +133,83 @@ export default function ProjectsPage() {
       </div>
 
       {/* MODERN ANIMATED INVENTORY STATS BOXES */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Card 1: Estates */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Farmland Estates
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Estates
             </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
-              <Trees className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <Trees className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
-              {totalProjects} <span className="text-sm font-sans font-medium text-slate-500">Locations</span>
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-slate-900">
+              {totalProjects} <span className="text-xs sm:text-sm font-sans font-medium text-slate-500">Locations</span>
             </div>
-            <p className="text-xs text-emerald-700 mt-1 font-medium">Coimbatore Foothills & Pollachi</p>
+            <p className="text-[11px] sm:text-xs text-emerald-700 mt-1 font-medium truncate">Coimbatore & Pollachi</p>
           </div>
         </div>
 
         {/* Card 2: Total Plots Master */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-400" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Plots Master
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Master Plots
             </span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-700 group-hover:scale-110 transition-transform">
-              <Layers className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-blue-50 text-blue-700 group-hover:scale-110 transition-transform">
+              <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-blue-800">
-              {totalInventory} <span className="text-sm font-sans font-medium text-slate-500">Plots</span>
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-blue-800">
+              {totalInventory} <span className="text-xs sm:text-sm font-sans font-medium text-slate-500">Plots</span>
             </div>
-            <p className="text-xs text-blue-600 mt-1 font-medium">Total Master Inventory</p>
+            <p className="text-[11px] sm:text-xs text-blue-600 mt-1 font-medium truncate">Total Inventory</p>
           </div>
         </div>
 
         {/* Card 3: Available for Sale */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-green-500" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Available for Sale
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Available
             </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
-              <CheckCircle2 className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-emerald-700">
-              {availableInventory} <span className="text-sm font-sans font-medium text-slate-500">Plots</span>
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-emerald-700">
+              {availableInventory} <span className="text-xs sm:text-sm font-sans font-medium text-slate-500">Plots</span>
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-700 font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Ready for immediate registration</span>
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] sm:text-xs text-emerald-700 font-medium truncate">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="truncate">Ready for registry</span>
             </div>
           </div>
         </div>
 
         {/* Card 4: Booked / Registered */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white p-3.5 sm:p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-400" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Occupancy / Sold
+            <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+              Occupancy
             </span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 group-hover:scale-110 transition-transform">
-              <Sparkles className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-amber-50 text-amber-700 group-hover:scale-110 transition-transform">
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-bold font-mono tracking-tight text-amber-800">
-              {occupancyRate}% <span className="text-sm font-sans font-medium text-slate-500">({bookedOrSold} Plots)</span>
+          <div className="mt-2 sm:mt-3">
+            <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-amber-800">
+              {occupancyRate}% <span className="text-xs sm:text-sm font-sans font-medium text-slate-500 truncate">({bookedOrSold})</span>
             </div>
-            <p className="text-xs text-amber-700 mt-1 font-medium">Under Token or Registry</p>
+            <p className="text-[11px] sm:text-xs text-amber-700 mt-1 font-medium truncate">Token or Registry</p>
           </div>
         </div>
       </div>

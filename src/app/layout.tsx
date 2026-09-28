@@ -7,6 +7,11 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Kyra Group CRM — Coimbatore Farmland Plots',
   description: 'Lead Management & Sales Automation CRM for Kyra Group Farmlands',
+  icons: {
+    icon: '/kyra-icon.png',
+    shortcut: '/kyra-icon.png',
+    apple: '/kyra-icon.png',
+  },
 };
 
 export default function RootLayout({

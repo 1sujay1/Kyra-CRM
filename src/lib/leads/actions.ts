@@ -5,6 +5,7 @@ import { getCurrentUserAction } from '@/lib/auth/actions';
 import { LeadDetailed, ActivityItem, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
 import { LeadStatusType } from '@/components/leads/status-change-modal';
 import { readLocalJson, writeLocalJson } from '@/lib/storage';
+import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
 
 const LEADS_FILE = 'leads.json';
 
@@ -73,7 +74,21 @@ export async function createLeadAction(newLead: LeadDetailed): Promise<{ success
       newLead.id = crypto.randomUUID();
     }
 
-    // 2. Persist to Supabase Postgres (Primary source of truth)
+    // 2. Validate phone number (without 10 digits -> Number Not Valid, duplicate number -> Duplicate Number)
+    const phoneCheck = validateIndianPhoneNumber(newLead.phone);
+    if (!phoneCheck.isValid && newLead.status === 'new') {
+      newLead.status = 'number_not_valid';
+    } else if (phoneCheck.isValid && newLead.status === 'new') {
+      const localLeads = readLocalJson<LeadDetailed[]>(LEADS_FILE, []);
+      const isDuplicate = localLeads.some(
+        (l) => l.id !== newLead.id && getCorePhoneDigits(l.phone) === phoneCheck.cleanDigits
+      );
+      if (isDuplicate) {
+        newLead.status = 'duplicate_number';
+      }
+    }
+
+    // 3. Persist to Supabase Postgres (Primary source of truth)
     try {
       const supabase = (await createClient()) as any;
       const { error: insertError } = await supabase.from('leads').insert({

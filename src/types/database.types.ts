@@ -20,7 +20,9 @@ export type LeadStatus =
   | 'negotiation'
   | 'booked'
   | 'lost'
-  | 'junk';
+  | 'junk'
+  | 'number_not_valid'
+  | 'duplicate_number';
 export type LeadQuality = 'hot' | 'warm' | 'cold' | 'junk' | 'unqualified';
 export type LeadPurpose = 'investment' | 'farmhouse' | 'agriculture' | 'other';
 export type ActivityType =

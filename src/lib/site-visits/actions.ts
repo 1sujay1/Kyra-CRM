@@ -28,68 +28,8 @@ export interface SiteVisitItem {
 
 const VISITS_STORE_KEY = 'site_visits.json';
 
-const DEFAULT_SITE_VISITS: SiteVisitItem[] = [
-  {
-    id: 'sv-101',
-    visitor_name: 'Karthik Raja',
-    visitor_phone: '+919842109876',
-    visitor_email: 'karthik.raja@gmail.com',
-    project_name: 'Pollachi Coconut Groves',
-    scheduled_at: new Date(Date.now() + 86400000).toISOString(),
-    pickup_required: true,
-    pickup_location: 'Coimbatore International Airport (CJB)',
-    driver_name: 'Murugan (Innova Crysta)',
-    vehicle_number: 'TN 38 BK 4901',
-    assigned_executive: 'Priya Raman',
-    status: 'scheduled',
-    feedback: null,
-    interest_level: null,
-    plots_shown: ['Plot 02', 'Plot 03'],
-    notes: 'Arriving by Indigo 6E-542 from Chennai. Needs farm gate pickup.',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'sv-102',
-    visitor_name: 'Dr. Anand S',
-    visitor_phone: '+919443219876',
-    visitor_email: 'dranand.ortho@outlook.com',
-    project_name: 'Anaikatti Green Acres',
-    scheduled_at: new Date(Date.now() + 172800000).toISOString(),
-    pickup_required: false,
-    pickup_location: null,
-    driver_name: null,
-    vehicle_number: null,
-    assigned_executive: 'Suresh Narayanan',
-    status: 'scheduled',
-    feedback: null,
-    interest_level: null,
-    plots_shown: ['Plot 07', 'Plot 14'],
-    notes: 'Interested in mountain-facing boundary plots for weekend natural farming retreat.',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'sv-103',
-    visitor_name: 'Lakshmi Narayanan',
-    visitor_phone: '+919894012345',
-    visitor_email: 'lakshminarayanan@yahoo.co.in',
-    project_name: 'Siruvani Valley Farmlands',
-    scheduled_at: new Date(Date.now() - 86400000).toISOString(),
-    pickup_required: true,
-    pickup_location: 'Coimbatore Junction Railway Station (CBE)',
-    driver_name: 'Selvakumar',
-    vehicle_number: 'TN 37 CB 1122',
-    assigned_executive: 'Priya Raman',
-    status: 'completed',
-    feedback: 'Loved the sweet Siruvani water taste (TDS 45) and mountain view. Requested price calculation for 50 cents plot.',
-    interest_level: 'hot',
-    plots_shown: ['Plot 05', 'Plot 08', 'Plot 11'],
-    notes: 'Completed tour on time. Follow-up scheduled for plot agreement.',
-    created_at: new Date(Date.now() - 90000000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
+// Zero mock data: Only real customer site visits from status changes or manual scheduling appear
+const DEFAULT_SITE_VISITS: SiteVisitItem[] = [];
 
 export async function fetchSiteVisitsAction(): Promise<SiteVisitItem[]> {
   try {

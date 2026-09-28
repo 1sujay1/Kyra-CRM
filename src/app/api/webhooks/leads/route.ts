@@ -2,27 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { readLocalJson, writeLocalJson } from '@/lib/storage';
 import { LeadDetailed } from '@/components/leads/lead-360-drawer';
+import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
 
 const LEADS_FILE = 'leads.json';
-
-// Helper to normalize Indian phone numbers to E.164 (+91XXXXXXXXXX)
-function normalizePhone(rawPhone?: string): string {
-  if (!rawPhone) return '+919876543210';
-  let cleaned = rawPhone.replace(/[^\d+]/g, '');
-  if (cleaned.startsWith('0')) {
-    cleaned = cleaned.slice(1);
-  }
-  if (!cleaned.startsWith('+')) {
-    if (cleaned.length === 10) {
-      cleaned = '+91' + cleaned;
-    } else if (cleaned.startsWith('91') && cleaned.length === 12) {
-      cleaned = '+' + cleaned;
-    } else {
-      cleaned = '+91' + cleaned;
-    }
-  }
-  return cleaned;
-}
 
 // GET: Meta Webhook verification handshake or health status
 export async function GET(req: NextRequest) {
@@ -116,13 +98,54 @@ export async function POST(req: NextRequest) {
       externalLeadId = rawBody.id || rawBody.external_lead_id;
     }
 
-    const normalizedPhone = normalizePhone(phone);
+    // 1. Phone number strict 10-digit validation
+    const phoneCheck = validateIndianPhoneNumber(phone);
+    let leadStatus: 'new' | 'number_not_valid' | 'duplicate_number' = 'new';
+    let statusComment = `Ingested automatically via ${source.toUpperCase()} webhook`;
+
+    if (!phoneCheck.isValid) {
+      leadStatus = 'number_not_valid';
+      statusComment = `Webhook received phone without 10 digits (${phoneCheck.digitCount} digits: ${phoneCheck.cleanDigits || 'empty'}). Status: Number Not Valid.`;
+    } else {
+      // 2. Duplicate Check: If received multiple times with same 10-digit number
+      const localLeads = readLocalJson<LeadDetailed[]>(LEADS_FILE, []);
+      let isDuplicate = localLeads.some(
+        (l) => getCorePhoneDigits(l.phone) === phoneCheck.cleanDigits
+      );
+
+      if (!isDuplicate) {
+        try {
+          const supabase = (await createClient()) as any;
+          const { data: existingDb } = await supabase
+            .from('leads')
+            .select('id, phone')
+            .ilike('phone', `%${phoneCheck.cleanDigits}%`)
+            .limit(1);
+
+          if (existingDb && existingDb.length > 0) {
+            isDuplicate = true;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (isDuplicate) {
+        leadStatus = 'duplicate_number';
+        statusComment = `Duplicate lead received with same phone number ${phoneCheck.formatted}. Status: Duplicate Number.`;
+      }
+    }
+
+    const savedPhone = phoneCheck.isValid
+      ? phoneCheck.formatted
+      : (phone || 'Invalid Number');
+
     const newLeadId = crypto.randomUUID();
 
     const newLead: LeadDetailed = {
       id: newLeadId,
       full_name: fullName,
-      phone: normalizedPhone,
+      phone: savedPhone,
       email: email,
       city: city,
       project_name: projectName,
@@ -130,17 +153,17 @@ export async function POST(req: NextRequest) {
       campaign_name: campaignName,
       budget_range: budgetRange,
       purpose: (['investment', 'farmhouse', 'agriculture'].includes(purpose) ? purpose : 'farmhouse') as 'investment' | 'farmhouse' | 'agriculture',
-      status: 'new',
-      quality: quality as any,
+      status: leadStatus,
+      quality: leadStatus === 'number_not_valid' ? 'junk' : (quality as any),
       assigned_to_name: 'Priya Raman',
       created_at: new Date().toISOString(),
       status_history: [
         {
           id: `sh-${Date.now()}`,
           from_status: null,
-          to_status: 'new',
-          comment: `Ingested automatically via ${source.toUpperCase()} webhook`,
-          changed_by: 'Webhook System',
+          to_status: leadStatus,
+          comment: statusComment,
+          changed_by: 'Webhook Ingestion Service',
           created_at: new Date().toISOString(),
         },
       ],
@@ -148,8 +171,8 @@ export async function POST(req: NextRequest) {
         {
           id: `act-${Date.now()}`,
           type: 'note',
-          outcome: 'Lead Captured',
-          notes: `Automated lead ingestion from ${source}. Campaign: ${campaignName}`,
+          outcome: leadStatus === 'number_not_valid' ? 'Invalid Phone Number' : leadStatus === 'duplicate_number' ? 'Duplicate Number Detected' : 'Lead Captured',
+          notes: `${statusComment}. Campaign: ${campaignName}`,
           created_by: 'Webhook Ingestion Service',
           created_at: new Date().toISOString(),
         },

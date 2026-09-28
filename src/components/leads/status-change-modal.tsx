@@ -21,7 +21,9 @@ export type LeadStatusType =
   | 'negotiation'
   | 'booked'
   | 'lost'
-  | 'junk';
+  | 'junk'
+  | 'number_not_valid'
+  | 'duplicate_number';
 
 interface StatusChangeModalProps {
   open: boolean;
@@ -42,6 +44,8 @@ const statusOptions: { value: LeadStatusType; label: string; color: string }[] =
   { value: 'booked', label: 'Booked Plot', color: 'bg-emerald-100 text-emerald-800' },
   { value: 'lost', label: 'Lost Opportunity', color: 'bg-rose-100 text-rose-800' },
   { value: 'junk', label: 'Junk / Not Interested', color: 'bg-slate-100 text-slate-800' },
+  { value: 'number_not_valid', label: 'Number Not Valid', color: 'bg-rose-100 text-rose-800 border-rose-300' },
+  { value: 'duplicate_number', label: 'Duplicate Number', color: 'bg-purple-100 text-purple-800 border-purple-300' },
 ];
 
 export function StatusChangeModal({

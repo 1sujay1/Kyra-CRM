@@ -31,17 +31,67 @@ export function normalizeIndianPhone(input: string): string | null {
   return null;
 }
 
+/**
+ * Extract 10-digit core mobile number (stripping +91, 91, or leading 0).
+ */
+export function getCorePhoneDigits(input: string | null | undefined): string {
+  if (!input) return '';
+  let digits = input.trim().replace(/\D/g, '');
+  if (digits.startsWith('91') && digits.length > 10) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('0') && digits.length > 10) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}
+
+/**
+ * Validate phone number: strictly requires exactly 10 digits.
+ * If 8, 9, 11, 12, or other non-10 digit length, returns isValid = false.
+ */
+export function validateIndianPhoneNumber(input: string | null | undefined): {
+  isValid: boolean;
+  cleanDigits: string;
+  formatted: string;
+  digitCount: number;
+} {
+  if (!input || !input.trim()) {
+    return { isValid: false, cleanDigits: '', formatted: 'N/A', digitCount: 0 };
+  }
+
+  const cleanDigits = getCorePhoneDigits(input);
+
+  if (cleanDigits.length === 10) {
+    return {
+      isValid: true,
+      cleanDigits,
+      formatted: `+91${cleanDigits}`,
+      digitCount: 10,
+    };
+  }
+
+  return {
+    isValid: false,
+    cleanDigits,
+    formatted: input.trim(),
+    digitCount: cleanDigits.length,
+  };
+}
+
 export function maskPhone(phone: string | null | undefined): string {
   if (!phone) return 'N/A';
   
-  // Example: +919876543210 -> +91 98XXXXX210
-  const normalized = normalizeIndianPhone(phone) || phone;
-  const digits = normalized.replace(/\D/g, '');
+  const digits = getCorePhoneDigits(phone);
 
-  if (digits.length >= 10) {
+  if (digits.length === 10) {
     const last3 = digits.slice(-3);
-    const prefix = digits.length > 10 ? digits.slice(-10, -8) : digits.slice(0, 2);
+    const prefix = digits.slice(0, 2);
     return `+91 ${prefix}XXXXX${last3}`;
+  }
+
+  // If invalid length, show partial or raw
+  if (digits.length > 0) {
+    return `+91 ${digits}`;
   }
 
   return '**********';

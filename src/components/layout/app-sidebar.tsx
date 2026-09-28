@@ -58,13 +58,13 @@ export function AppSidebar({ userRole = 'admin' }: SidebarProps) {
   return (
     <aside className="w-64 border-r bg-card flex flex-col h-screen fixed left-0 top-0 z-30">
       {/* Brand Header */}
-      <div className="h-16 border-b px-6 flex items-center gap-3 bg-emerald-900 text-white">
-        <div className="h-9 w-9 rounded-lg bg-emerald-700 flex items-center justify-center font-bold text-lg text-emerald-100 shadow-inner">
-          K
+      <div className="h-16 border-b px-5 flex items-center gap-3 bg-emerald-950 text-white">
+        <div className="h-10 w-10 rounded-lg bg-white p-1 flex items-center justify-center shadow-sm overflow-hidden shrink-0">
+          <img src="/kyra-icon.png" alt="Kyra Group" className="h-full w-full object-contain" />
         </div>
-        <div>
-          <h1 className="font-bold text-base leading-tight tracking-wide">Kyra Group</h1>
-          <p className="text-xs text-emerald-300 font-medium">Coimbatore Farmlands</p>
+        <div className="min-w-0">
+          <h1 className="font-bold text-base leading-tight tracking-wide truncate">Kyra Group</h1>
+          <p className="text-[11px] text-emerald-300 font-medium truncate">Coimbatore Farmlands</p>
         </div>
       </div>
 

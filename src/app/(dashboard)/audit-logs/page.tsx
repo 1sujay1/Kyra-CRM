@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, FileText, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { fetchLoginAuditLogsAction } from '@/lib/auth/actions';
 
-const auditEntries = [
+const initialAuditEntries = [
   {
     id: 'log-1',
     user: 'Adminkyra (Admin)',
@@ -42,6 +43,16 @@ const auditEntries = [
 ];
 
 export default function AuditLogsPage() {
+  const [logs, setLogs] = useState(initialAuditEntries);
+
+  useEffect(() => {
+    fetchLoginAuditLogsAction().then((dbLogs) => {
+      if (dbLogs && dbLogs.length > 0) {
+        setLogs([...dbLogs, ...initialAuditEntries]);
+      }
+    });
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -65,11 +76,22 @@ export default function AuditLogsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {auditEntries.map((log) => (
+            {logs.map((log) => (
               <TableRow key={log.id}>
                 <TableCell className="text-xs font-semibold">{log.user}</TableCell>
                 <TableCell>
-                  <Badge variant={log.action === 'phone_reveal' ? 'warning' : 'secondary'} className="text-[10px] uppercase font-mono">
+                  <Badge
+                    variant={
+                      log.action === 'login_success'
+                        ? 'success'
+                        : log.action === 'login_failed'
+                        ? 'destructive'
+                        : log.action === 'phone_reveal'
+                        ? 'warning'
+                        : 'secondary'
+                    }
+                    className="text-[10px] uppercase font-mono"
+                  >
                     {log.action}
                   </Badge>
                 </TableCell>
@@ -84,3 +106,4 @@ export default function AuditLogsPage() {
     </div>
   );
 }
+

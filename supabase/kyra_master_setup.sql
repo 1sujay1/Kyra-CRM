@@ -335,7 +335,49 @@ create policy "Allow all insert webhook logs" on webhook_logs for insert to anon
 drop policy if exists "Allow all read profiles" on profiles;
 create policy "Allow all read profiles" on profiles for select to anon, authenticated using (true);
 
--- 12. EXPLICIT GRANTS TO DATA API ROLES (anon, authenticated, service_role)
+drop policy if exists "Allow all insert profiles" on profiles;
+create policy "Allow all insert profiles" on profiles for insert to anon, authenticated with check (true);
+
+drop policy if exists "Allow all update profiles" on profiles;
+create policy "Allow all update profiles" on profiles for update to anon, authenticated using (true) with check (true);
+
+-- 12. User Logins Audit Table
+create table if not exists user_logins (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null default '00000000-0000-0000-0000-000000000000' references organizations(id) on delete cascade,
+  username text not null,
+  email text not null,
+  role text not null,
+  ip_address text,
+  user_agent text,
+  status text not null default 'success', -- 'success', 'failed'
+  failure_reason text,
+  created_at timestamptz not null default now()
+);
+
+alter table user_logins enable row level security;
+
+create index if not exists idx_user_logins_username on user_logins(username);
+create index if not exists idx_user_logins_created_at on user_logins(created_at desc);
+
+drop policy if exists "Allow all read user_logins" on user_logins;
+create policy "Allow all read user_logins" on user_logins for select to anon, authenticated using (true);
+
+drop policy if exists "Allow all insert user_logins" on user_logins;
+create policy "Allow all insert user_logins" on user_logins for insert to anon, authenticated with check (true);
+
+-- Pre-seed Authorized Profiles
+insert into profiles (org_id, username, full_name, email, role, is_active)
+values 
+  ('00000000-0000-0000-0000-000000000000', 'Adminkyra', 'Kyra Administrator', 'adminkyra@kyragroup.com', 'admin', true),
+  ('00000000-0000-0000-0000-000000000000', 'dmkyra', 'Digital Marketing Lead', 'dmkyra@kyragroup.com', 'digital_marketing', true)
+on conflict (username) do update set
+  full_name = excluded.full_name,
+  email = excluded.email,
+  role = excluded.role,
+  updated_at = now();
+
+-- 13. EXPLICIT GRANTS TO DATA API ROLES (anon, authenticated, service_role)
 grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
 grant all on all sequences in schema public to anon, authenticated, service_role;

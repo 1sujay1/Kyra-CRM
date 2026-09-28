@@ -33,10 +33,10 @@ const auditEntries = [
   },
   {
     id: 'log-4',
-    user: 'Meta Ads Webhook',
+    user: 'Meta Ads Automated Ingestion',
     action: 'lead_create',
     entity: 'Campaign: Coimbatore_Foothills_Farmplots',
-    ip: 'Meta Graph Webhook Server',
+    ip: 'Meta Ads Automated Platform',
     time: '3 hours ago',
   },
 ];

@@ -37,7 +37,7 @@ const STAGES: StageConfig[] = [
     key: 'new',
     statusValues: ['new'],
     label: '1. New Inbound',
-    sublabel: 'Meta, Google & Webhooks',
+    sublabel: 'Digital Ads & Enquiries',
     icon: Sparkles,
     color: 'text-blue-600',
     badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',

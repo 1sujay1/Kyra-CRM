@@ -169,7 +169,7 @@ function LoginForm() {
       <div className="border-t pt-4 text-center">
         <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-          <span>Supabase Auth & Role-Based Access Control (RBAC)</span>
+          <span>Enterprise Security & Role-Based Access Control (RBAC)</span>
         </p>
       </div>
     </div>

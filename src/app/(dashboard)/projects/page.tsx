@@ -98,8 +98,8 @@ export default function ProjectsPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <span>Farmland Projects & Inventory</span>
-              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-300 font-mono">
-                Supabase Postgres
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-200">
+                Coimbatore Farmlands
               </Badge>
             </h2>
           </div>
@@ -168,7 +168,7 @@ export default function ProjectsPage() {
             <div className="text-3xl font-bold font-mono tracking-tight text-blue-800">
               {totalInventory} <span className="text-sm font-sans font-medium text-slate-500">Plots</span>
             </div>
-            <p className="text-xs text-blue-600 mt-1 font-medium">Recorded in Supabase Inventory</p>
+            <p className="text-xs text-blue-600 mt-1 font-medium">Total Master Inventory</p>
           </div>
         </div>
 
@@ -284,7 +284,7 @@ export default function ProjectsPage() {
       {isLoading ? (
         <div className="p-12 text-center text-xs text-muted-foreground bg-white rounded-xl border border-slate-200">
           <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-emerald-600" />
-          <span>Synchronizing farmland estates and plot matrices from Supabase...</span>
+          <span>Loading farmland estates and plot inventories...</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -9,6 +9,7 @@ import {
   Plus,
   Eye,
   Calendar,
+  CalendarCheck,
   Clock,
   Sparkles,
   PhoneCall,
@@ -16,8 +17,6 @@ import {
   Trash2,
   Shield,
   Loader2,
-  Webhook,
-  Database,
   ArrowUpRight,
   TrendingUp,
 } from 'lucide-react';
@@ -38,7 +37,6 @@ import { StatusChangeModal, LeadStatusType } from '@/components/leads/status-cha
 import { Lead360Drawer, LeadDetailed, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
 import { NewLeadModal } from '@/components/leads/new-lead-modal';
 import { LeadPipelineDiagram } from '@/components/leads/lead-pipeline-diagram';
-import { WebhookSimulatorModal } from '@/components/leads/webhook-simulator-modal';
 import {
   fetchLeadsAction,
   updateLeadStatusAction,
@@ -80,10 +78,7 @@ export default function LeadsPage() {
   // New Lead Modal State
   const [newLeadModalOpen, setNewLeadModalOpen] = useState(false);
 
-  // Webhook Ingestion & SQL Setup Modal State
-  const [webhookModalOpen, setWebhookModalOpen] = useState(false);
-
-  // Load from Supabase / Persistent cache on mount
+  // Load leads on mount
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -119,7 +114,7 @@ export default function LeadsPage() {
     setStatusModalOpen(true);
   };
 
-  // Status Change Handler with Supabase Persistence
+  // Status Change Handler with Persistence
   const handleStatusChanged = async (leadId: string, newStatus: LeadStatusType, comment: string) => {
     // 1. Optimistic UI update
     setLeads((prev) =>
@@ -150,7 +145,7 @@ export default function LeadsPage() {
       })
     );
 
-    // 2. Persist to Supabase and local cache
+    // 2. Persist update
     await updateLeadStatusAction(leadId, newStatus, comment);
   };
 
@@ -168,15 +163,10 @@ export default function LeadsPage() {
     setDrawerOpen(true);
   };
 
-  // New Lead Created Handler with Supabase Persistence
+  // New Lead Created Handler
   const handleLeadCreated = async (newLead: LeadDetailed) => {
     setLeads((prev) => [newLead, ...prev]);
     await createLeadAction(newLead);
-  };
-
-  // Ingested via Webhook Modal / API Handler
-  const handleWebhookLeadIngested = (ingestedLead: LeadDetailed) => {
-    setLeads((prev) => [ingestedLead, ...prev]);
   };
 
   // Delete Lead Handler (STRICTLY Admin Only)
@@ -197,7 +187,7 @@ export default function LeadsPage() {
       setDrawerOpen(false);
     }
 
-    // Persist soft-delete to Supabase & persistent cache
+    // Persist soft-delete
     const res = await deleteLeadAction(leadId);
     if (!res.success) {
       alert(res.error || 'Failed to delete lead.');
@@ -249,6 +239,16 @@ export default function LeadsPage() {
     document.body.removeChild(link);
   };
 
+  // Source filters
+  const sourceMatches = (leadSource: string, filter: string) => {
+    if (filter === 'all') return true;
+    if (filter === 'meta') return leadSource === 'meta';
+    if (filter === 'google') return leadSource === 'google';
+    if (filter === 'online') return leadSource === 'webhook' || leadSource === 'website' || leadSource === 'zapier';
+    if (filter === 'direct') return leadSource === 'manual' || leadSource === 'walk_in' || leadSource === 'referral';
+    return leadSource === filter;
+  };
+
   // Filtered Leads
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch =
@@ -256,8 +256,7 @@ export default function LeadsPage() {
       lead.phone.includes(searchTerm) ||
       lead.project_name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesSource =
-      selectedSource === 'all' || lead.source === selectedSource;
+    const matchesSource = sourceMatches(lead.source, selectedSource);
 
     const matchesStage =
       selectedStageFilter === 'all' ||
@@ -276,19 +275,16 @@ export default function LeadsPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
               <span>Farmland Leads Pipeline</span>
-              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-300 font-mono">
-                Supabase Connected
-              </Badge>
             </h2>
             <Badge
               variant={userRole === 'admin' ? 'default' : 'secondary'}
               className="text-[10px] uppercase font-mono tracking-wider ml-1"
             >
-              {userRole === 'admin' ? 'Admin (Full Access)' : 'Digital Marketing (Modify Only)'}
+              {userRole === 'admin' ? 'Admin Access' : 'Marketing Executive'}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Real-time Meta Lead Ads, Google Ads, and walk-in enquiries synchronized with Supabase Postgres.
+            Real-time lead tracking across social media campaigns, search ads, and direct customer enquiries.
           </p>
         </div>
 
@@ -296,18 +292,8 @@ export default function LeadsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setWebhookModalOpen(true)}
-            className="gap-2 text-xs border-slate-300 hover:bg-slate-100 shadow-xs"
-          >
-            <Webhook className="h-4 w-4 text-emerald-600" />
-            <span>Webhook & DB Setup</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
             onClick={handleExportCSV}
-            className="gap-2 text-xs hover:bg-slate-100 shadow-xs"
+            className="gap-2 text-xs hover:bg-slate-100 shadow-xs cursor-pointer"
           >
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
@@ -316,7 +302,7 @@ export default function LeadsPage() {
           <Button
             size="sm"
             onClick={() => setNewLeadModalOpen(true)}
-            className="gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-medium shadow-sm transition-all hover:scale-[1.02]"
+            className="gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-medium shadow-sm transition-all hover:scale-[1.02] cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span>+ New Lead</span>
@@ -348,34 +334,34 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        {/* Card 2: Meta Lead Ads */}
+        {/* Card 2: Meta Campaigns */}
         <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-400" />
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Meta Lead Ads
+              Meta Campaigns
             </span>
             <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-mono">
-              Graph API
+              Active Ads
             </Badge>
           </div>
           <div className="mt-3">
             <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
               {leads.filter((l) => l.source === 'meta').length}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Anaikatti & Siruvani adsets</p>
+            <p className="text-xs text-slate-500 mt-1">Anaikatti & Siruvani buyers</p>
           </div>
         </div>
 
-        {/* Card 3: Google Ads Leads */}
+        {/* Card 3: Google Search Ads */}
         <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-400" />
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Google Ads Leads
+              Google Search Ads
             </span>
             <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-mono">
-              Search Forms
+              High Intent
             </Badge>
           </div>
           <div className="mt-3">
@@ -386,26 +372,23 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        {/* Card 4: Webhook Ingested Leads */}
-        <div
-          onClick={() => setWebhookModalOpen(true)}
-          className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-purple-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-        >
+        {/* Card 4: Site Visits Booked */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-purple-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Webhooks & APIs
+              Site Visits Booked
             </span>
             <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:scale-110 transition-transform">
-              <Webhook className="h-4 w-4" />
+              <CalendarCheck className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-3xl font-bold font-mono tracking-tight text-purple-900">
-              {leads.filter((l) => l.source === 'webhook' || l.source === 'zapier').length}
+              {leads.filter((l) => l.status === 'site_visit_scheduled' || l.status === 'site_visit_completed').length}
             </div>
             <div className="flex items-center justify-between text-xs text-purple-700 mt-1 font-medium">
-              <span>POST /api/webhooks/leads</span>
+              <span>Coimbatore Foothills & Pollachi</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </div>
           </div>
@@ -437,17 +420,23 @@ export default function LeadsPage() {
               <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mr-1">
                 <Filter className="h-3.5 w-3.5" /> Source:
               </span>
-              {(['all', 'meta', 'google', 'webhook', 'walk_in', 'manual'] as const).map((source) => (
+              {[
+                { id: 'all', label: 'All Sources' },
+                { id: 'meta', label: 'Meta Ads' },
+                { id: 'google', label: 'Google Search' },
+                { id: 'online', label: 'Online Enquiries' },
+                { id: 'direct', label: 'Direct / Walk-in' },
+              ].map((item) => (
                 <Button
-                  key={source}
-                  variant={selectedSource === source ? 'default' : 'outline'}
+                  key={item.id}
+                  variant={selectedSource === item.id ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedSource(source)}
-                  className={`text-xs h-8 capitalize cursor-pointer ${
-                    selectedSource === source ? 'bg-emerald-700 text-white' : ''
+                  onClick={() => setSelectedSource(item.id)}
+                  className={`text-xs h-8 cursor-pointer ${
+                    selectedSource === item.id ? 'bg-emerald-700 text-white' : ''
                   }`}
                 >
-                  {source === 'all' ? 'All Sources' : source}
+                  {item.label}
                 </Button>
               ))}
 
@@ -471,7 +460,7 @@ export default function LeadsPage() {
         {loading ? (
           <div className="p-14 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
             <Loader2 className="h-7 w-7 animate-spin text-emerald-700" />
-            <span className="font-medium text-slate-700">Synchronizing leads with Supabase Database...</span>
+            <span className="font-medium text-slate-700">Loading prospective buyer enquiries...</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -501,25 +490,16 @@ export default function LeadsPage() {
                         </div>
                         <p className="font-bold text-slate-800 text-sm">No Leads Found in this Pipeline Filter</p>
                         <p className="text-slate-500 max-w-sm text-xs">
-                          Click &quot;+ New Lead&quot; to manually add an enquiry or use &quot;Webhook & DB Setup&quot; to test instant incoming leads.
+                          Click &quot;+ New Lead&quot; to register your first farmland buyer enquiry or adjust your filter selection.
                         </p>
                         <div className="flex items-center gap-2 mt-2">
                           <Button
                             size="sm"
                             onClick={() => setNewLeadModalOpen(true)}
-                            className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5"
+                            className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5 cursor-pointer"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             <span>+ New Lead</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setWebhookModalOpen(true)}
-                            className="text-xs gap-1.5"
-                          >
-                            <Webhook className="h-3.5 w-3.5 text-purple-600" />
-                            <span>Simulate Webhook Lead</span>
                           </Button>
                         </div>
                       </div>
@@ -587,12 +567,18 @@ export default function LeadsPage() {
                                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                                   : lead.source === 'google'
                                   ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : lead.source === 'webhook'
+                                  : lead.source === 'webhook' || lead.source === 'website'
                                   ? 'bg-purple-50 text-purple-700 border-purple-200'
                                   : 'bg-slate-100 text-slate-700 border-slate-200'
                               }`}
                             >
-                              {lead.source}
+                              {lead.source === 'meta'
+                                ? 'Meta Ads'
+                                : lead.source === 'google'
+                                ? 'Google Search'
+                                : lead.source === 'webhook' || lead.source === 'website'
+                                ? 'Online Campaign'
+                                : 'Direct / Walk-in'}
                             </Badge>
                             {lead.campaign_name && (
                               <span className="text-[10px] text-muted-foreground truncate max-w-[110px]" title={lead.campaign_name}>
@@ -666,7 +652,7 @@ export default function LeadsPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleOpen360(lead)}
-                              className="h-7 w-7 p-0 text-slate-500 hover:text-emerald-700"
+                              className="h-7 w-7 p-0 text-slate-500 hover:text-emerald-700 cursor-pointer"
                               title="View Lead 360"
                             >
                               <ArrowUpRight className="h-3.5 w-3.5" />
@@ -677,7 +663,7 @@ export default function LeadsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={(e) => handleDeleteLead(e, lead.id)}
-                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 cursor-pointer"
                                 title="Delete Lead (Admin Only)"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -724,12 +710,6 @@ export default function LeadsPage() {
         open={newLeadModalOpen}
         onOpenChange={setNewLeadModalOpen}
         onLeadCreated={handleLeadCreated}
-      />
-
-      <WebhookSimulatorModal
-        isOpen={webhookModalOpen}
-        onClose={() => setWebhookModalOpen(false)}
-        onLeadIngested={handleWebhookLeadIngested}
       />
     </div>
   );

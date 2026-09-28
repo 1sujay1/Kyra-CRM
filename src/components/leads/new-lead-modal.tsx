@@ -48,7 +48,7 @@ export function NewLeadModal({
       return;
     }
 
-    const leadId = `lead-${Date.now()}`;
+    const leadId = crypto.randomUUID();
     const newLead: LeadDetailed = {
       id: leadId,
       full_name: fullName.trim(),

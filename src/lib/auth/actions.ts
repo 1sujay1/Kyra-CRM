@@ -88,23 +88,33 @@ export async function loginAction(identifierRaw: string, passwordRaw: string): P
     };
   }
 
-  // 2. Strict Password Check
-  if (password !== 'Kyra@1234#') {
+  // 2. Authenticate directly against Supabase database
+  let dbVerified = false;
+  try {
+    const supabase = await createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: validAccount.email,
+      password: password,
+    });
+
+    if (!authError || authError.code === 'email_not_confirmed') {
+      dbVerified = true;
+    } else if (authError.code === 'invalid_credentials') {
+      return {
+        success: false,
+        error: 'Invalid credentials. Password did not match database record.',
+      };
+    }
+  } catch (err: any) {
+    console.warn('Database authentication check error:', err?.message);
+  }
+
+  // Fallback verification if database network is unreachable
+  if (!dbVerified && password !== 'Kyra@1234#') {
     return {
       success: false,
       error: 'Invalid credentials. Password is case-sensitive: Kyra@1234#',
     };
-  }
-
-  // 3. Attempt Supabase Auth session creation if configured
-  try {
-    const supabase = await createClient();
-    await supabase.auth.signInWithPassword({
-      email: validAccount.email,
-      password: password,
-    });
-  } catch (err: any) {
-    console.warn('Supabase auth signin notice (proceeding with verified session):', err?.message);
   }
 
   // 4. Secure Cookie Session (7 days) with explicit path and sameSite

@@ -67,20 +67,16 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
 
 export async function createLeadAction(newLead: LeadDetailed): Promise<{ success: boolean; error?: string }> {
   try {
-    // 1. Immediately persist to local persistent storage so refresh/relogin NEVER loses the lead
-    const localLeads = readLocalJson<LeadDetailed[]>(LEADS_FILE, []);
-    const existingIndex = localLeads.findIndex((l) => l.id === newLead.id);
-    if (existingIndex >= 0) {
-      localLeads[existingIndex] = newLead;
-    } else {
-      localLeads.unshift(newLead);
+    // 1. Ensure id is a strictly valid UUID v4 so Postgres never throws 'invalid input syntax for type uuid'
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!newLead.id || !uuidPattern.test(newLead.id)) {
+      newLead.id = crypto.randomUUID();
     }
-    writeLocalJson(LEADS_FILE, localLeads);
 
-    // 2. Persist to Supabase Postgres
+    // 2. Persist to Supabase Postgres (Primary source of truth)
     try {
       const supabase = (await createClient()) as any;
-      const { error } = await supabase.from('leads').insert({
+      const { error: insertError } = await supabase.from('leads').insert({
         id: newLead.id,
         org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
         full_name: newLead.full_name,
@@ -89,7 +85,7 @@ export async function createLeadAction(newLead: LeadDetailed): Promise<{ success
         city: newLead.city || 'Coimbatore',
         project_name: newLead.project_name,
         source: newLead.source || 'manual',
-        campaign_name: newLead.campaign_name,
+        campaign_name: newLead.campaign_name || '',
         budget_range: newLead.budget_range,
         purpose: newLead.purpose,
         status: newLead.status,
@@ -98,12 +94,22 @@ export async function createLeadAction(newLead: LeadDetailed): Promise<{ success
         created_at: newLead.created_at || new Date().toISOString(),
       });
 
-      if (error) {
-        console.warn('Notice syncing lead to Supabase (saved in persistent store):', error.message);
+      if (insertError) {
+        console.error('[Supabase Lead Insert Notice]:', insertError.message);
       }
     } catch (e: any) {
-      console.warn('Supabase insert skipped, saved locally:', e.message);
+      console.warn('[Supabase Connection Notice]:', e.message);
     }
+
+    // 3. Persist to local backup storage
+    const localLeads = readLocalJson<LeadDetailed[]>(LEADS_FILE, []);
+    const existingIndex = localLeads.findIndex((l) => l.id === newLead.id);
+    if (existingIndex >= 0) {
+      localLeads[existingIndex] = newLead;
+    } else {
+      localLeads.unshift(newLead);
+    }
+    writeLocalJson(LEADS_FILE, localLeads);
 
     return { success: true };
   } catch (err: any) {

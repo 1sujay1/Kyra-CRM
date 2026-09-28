@@ -123,7 +123,7 @@ export async function fetchProjectsAction(): Promise<FarmlandProjectItem[]> {
       .is('deleted_at', null)
       .order('created_at', { ascending: true });
 
-    if (error || !data || data.length === 0) {
+    if (error || !data) {
       return localProjects;
     }
 
@@ -141,16 +141,59 @@ export async function fetchProjectsAction(): Promise<FarmlandProjectItem[]> {
       updated_at: d.updated_at,
     }));
 
-    // Merge with any unsynced local projects
-    const dbIds = new Set(mapped.map((p) => p.id));
-    const unSyncedLocals = localProjects.filter((p) => !dbIds.has(p.id));
-    const merged = [...mapped, ...unSyncedLocals];
+    // If Supabase has active projects, treat Supabase as source of truth and update local storage
+    if (mapped.length > 0) {
+      writeLocalJson(PROJECTS_FILE, mapped);
+      return mapped;
+    }
 
-    writeLocalJson(PROJECTS_FILE, merged);
-    return merged;
+    return localProjects;
   } catch (err: any) {
     console.warn('Notice fetching projects from Supabase (using persistent store):', err?.message);
     return localProjects;
+  }
+}
+
+export async function deleteProjectAction(
+  projectId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Remove from local persistent storage
+    const localProjects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+    const updatedProjects = localProjects.filter((p) => p.id !== projectId);
+    writeLocalJson(PROJECTS_FILE, updatedProjects);
+
+    const localPlotsRecord = readLocalJson<Record<string, PlotItem[]>>(PLOTS_FILE, {});
+    delete localPlotsRecord[projectId];
+    writeLocalJson(PLOTS_FILE, localPlotsRecord);
+
+    // 2. Delete from Supabase server database
+    try {
+      const supabase = (await createClient()) as any;
+
+      // Delete associated plots first
+      await supabase.from('plots').delete().eq('project_id', projectId);
+
+      // Delete the project from projects table
+      const { error: delError } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      // If hard delete fails due to constraint or policy, mark deleted_at
+      if (delError) {
+        await supabase
+          .from('projects')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', projectId);
+      }
+    } catch (dbErr: any) {
+      console.warn('Supabase project delete notice:', dbErr?.message);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to delete project.' };
   }
 }
 

@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   Plus,
   Edit,
+  Trash2,
   RefreshCw,
   Droplets,
   Sprout,
@@ -25,6 +26,7 @@ import { formatCurrencyINR } from '@/lib/utils';
 import {
   FarmlandProjectItem,
   fetchProjectsAction,
+  deleteProjectAction,
 } from '@/lib/projects/actions';
 import { EditProjectModal } from '@/components/projects/edit-project-modal';
 import { PlotMatrixModal } from '@/components/projects/plot-matrix-modal';
@@ -81,6 +83,34 @@ export default function ProjectsPage() {
       }
       return [...prev, savedProject];
     });
+  };
+
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+
+  const handleDeleteProject = async (e: React.MouseEvent, project: FarmlandProjectItem) => {
+    e.stopPropagation();
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${project.name}"?\n\nThis will remove the project and its plot inventory from the system and server database.`
+    );
+    if (!confirmed) return;
+
+    setDeletingProjectId(project.id);
+    try {
+      // Optimistic UI update
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+
+      const res = await deleteProjectAction(project.id);
+      if (!res.success) {
+        alert(res.error || 'Failed to delete project from server.');
+        loadProjects();
+      }
+    } catch (err: any) {
+      alert('Error deleting project. Please try again.');
+      loadProjects();
+    } finally {
+      setDeletingProjectId(null);
+    }
   };
 
   // KPI Calculations
@@ -286,6 +316,22 @@ export default function ProjectsPage() {
           <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-emerald-600" />
           <span>Loading farmland estates and plot inventories...</span>
         </div>
+      ) : projects.length === 0 ? (
+        <div className="p-12 text-center bg-white rounded-xl border border-dashed border-slate-300">
+          <Trees className="h-10 w-10 text-emerald-600 mx-auto mb-3 opacity-80" />
+          <h3 className="text-base font-semibold text-slate-900">No Farmland Projects Found</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+            All projects have been removed from the server database. Click below to add a new farmland project.
+          </p>
+          <Button
+            size="sm"
+            onClick={handleOpenCreate}
+            className="mt-4 gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
+          >
+            <Plus className="h-4 w-4" />
+            <span>+ Add New Project</span>
+          </Button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => (
@@ -319,6 +365,18 @@ export default function ProjectsPage() {
                       >
                         <Edit className="h-3.5 w-3.5 text-emerald-700" />
                         <span>Edit</span>
+                      </Button>
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => handleDeleteProject(e, project)}
+                        disabled={deletingProjectId === project.id}
+                        className="h-8 px-2.5 text-xs bg-white/90 hover:bg-red-50 text-red-600 hover:text-red-700 hover:border-red-200 shadow-xs gap-1 cursor-pointer transition-colors"
+                        title="Delete Project and Plot Inventory from Server"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                        <span>Delete</span>
                       </Button>
 
                       <div className="h-8 w-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center shadow-xs">

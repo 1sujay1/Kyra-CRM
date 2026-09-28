@@ -2,6 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUserAction } from '@/lib/auth/actions';
+import { readLocalJson, writeLocalJson } from '@/lib/storage';
+
+const PROJECTS_FILE = 'projects.json';
+const PLOTS_FILE = 'plots.json';
 
 export interface FarmlandProjectItem {
   id: string;
@@ -29,8 +33,7 @@ export interface PlotItem {
   buyer_name?: string | null;
 }
 
-// Initial seed projects
-let runtimeProjects: FarmlandProjectItem[] = [
+const DEFAULT_PROJECTS: FarmlandProjectItem[] = [
   {
     id: 'proj-1',
     name: 'Anaikatti Green Acres',
@@ -72,15 +75,8 @@ let runtimeProjects: FarmlandProjectItem[] = [
   },
 ];
 
-// In-memory runtime store for plots by project
-let runtimePlots: Record<string, PlotItem[]> = {};
-
-// Helper to seed plots for a project if not exists
-function getOrGeneratePlots(project: FarmlandProjectItem): PlotItem[] {
-  if (runtimePlots[project.id]) {
-    return runtimePlots[project.id];
-  }
-
+// Helper to generate default plots for a project if not exists
+function generatePlotsForProject(project: FarmlandProjectItem): PlotItem[] {
   const facings: PlotItem['facing'][] = ['east', 'north', 'north_east', 'west', 'south'];
   const plots: PlotItem[] = [];
 
@@ -113,11 +109,12 @@ function getOrGeneratePlots(project: FarmlandProjectItem): PlotItem[] {
     });
   }
 
-  runtimePlots[project.id] = plots;
   return plots;
 }
 
 export async function fetchProjectsAction(): Promise<FarmlandProjectItem[]> {
+  const localProjects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+
   try {
     const supabase = (await createClient()) as any;
     const { data, error } = await supabase
@@ -127,26 +124,33 @@ export async function fetchProjectsAction(): Promise<FarmlandProjectItem[]> {
       .order('created_at', { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return runtimeProjects;
+      return localProjects;
     }
 
-    // Merge Supabase data with runtime state
-    return data.map((d: any) => ({
+    const mapped: FarmlandProjectItem[] = data.map((d: any) => ({
       id: d.id,
       name: d.name,
       location: d.location,
       description: d.description || '',
       price_per_cent: Number(d.price_per_cent) || 125000,
       total_plots: d.total_plots || 30,
-      available_plots: d.available_plots || d.total_plots || 15,
+      available_plots: d.available_plots ?? d.total_plots ?? 15,
       status: d.status || 'active',
       water_source: d.water_source || 'Perennial Borewell + Stream',
       soil_type: d.soil_type || 'Red Loam Soil',
       updated_at: d.updated_at,
     }));
+
+    // Merge with any unsynced local projects
+    const dbIds = new Set(mapped.map((p) => p.id));
+    const unSyncedLocals = localProjects.filter((p) => !dbIds.has(p.id));
+    const merged = [...mapped, ...unSyncedLocals];
+
+    writeLocalJson(PROJECTS_FILE, merged);
+    return merged;
   } catch (err: any) {
-    console.warn('Error fetching projects from Supabase (using runtime):', err);
-    return runtimeProjects;
+    console.warn('Notice fetching projects from Supabase (using persistent store):', err?.message);
+    return localProjects;
   }
 }
 
@@ -165,30 +169,29 @@ export async function updateProjectAction(
   }
 ): Promise<{ success: boolean; data?: FarmlandProjectItem; error?: string }> {
   try {
-    const currentUser = await getCurrentUserAction();
-    const userRole = currentUser?.role || 'admin';
-
-    // Both Admin and Digital Marketing can update project details (DM has modify access)
-    const index = runtimeProjects.findIndex((p) => p.id === projectId);
+    // 1. Update in local persistent storage
+    const localProjects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+    const index = localProjects.findIndex((p) => p.id === projectId);
     let updatedProj: FarmlandProjectItem;
 
     if (index >= 0) {
-      runtimeProjects[index] = {
-        ...runtimeProjects[index],
+      localProjects[index] = {
+        ...localProjects[index],
         ...payload,
         updated_at: new Date().toISOString(),
       };
-      updatedProj = runtimeProjects[index];
+      updatedProj = localProjects[index];
     } else {
       updatedProj = {
         id: projectId,
         ...payload,
         updated_at: new Date().toISOString(),
       };
-      runtimeProjects.push(updatedProj);
+      localProjects.push(updatedProj);
     }
+    writeLocalJson(PROJECTS_FILE, localProjects);
 
-    // Sync to Supabase
+    // 2. Sync to Supabase
     try {
       const supabase = (await createClient()) as any;
       await supabase
@@ -199,12 +202,15 @@ export async function updateProjectAction(
           description: payload.description,
           price_per_cent: payload.price_per_cent,
           total_plots: payload.total_plots,
+          available_plots: payload.available_plots,
           status: payload.status,
+          water_source: payload.water_source,
+          soil_type: payload.soil_type,
           updated_at: new Date().toISOString(),
         })
         .eq('id', projectId);
     } catch (e: any) {
-      console.warn('Supabase projects sync skipped:', e.message);
+      console.warn('Supabase projects sync notice:', e.message);
     }
 
     return { success: true, data: updatedProj };
@@ -226,29 +232,59 @@ export async function createProjectAction(payload: {
 }): Promise<{ success: boolean; data?: FarmlandProjectItem; error?: string }> {
   try {
     const newProj: FarmlandProjectItem = {
-      id: crypto.randomUUID(),
+      id: `proj-${Date.now()}`,
       ...payload,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    runtimeProjects.push(newProj);
+    // 1. Update local persistent storage
+    const localProjects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+    localProjects.push(newProj);
+    writeLocalJson(PROJECTS_FILE, localProjects);
 
+    // 2. Seed plots for this project in local storage
+    const localPlotsRecord = readLocalJson<Record<string, PlotItem[]>>(PLOTS_FILE, {});
+    const generatedPlots = generatePlotsForProject(newProj);
+    localPlotsRecord[newProj.id] = generatedPlots;
+    writeLocalJson(PLOTS_FILE, localPlotsRecord);
+
+    // 3. Sync to Supabase
     try {
       const supabase = (await createClient()) as any;
       await supabase.from('projects').insert([
         {
           id: newProj.id,
+          org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
           name: newProj.name,
           location: newProj.location,
           description: newProj.description,
           price_per_cent: newProj.price_per_cent,
           total_plots: newProj.total_plots,
+          available_plots: newProj.available_plots,
           status: newProj.status,
+          water_source: newProj.water_source,
+          soil_type: newProj.soil_type,
         },
       ]);
+
+      // Seed plots into Supabase
+      const plotInserts = generatedPlots.map((p) => ({
+        id: p.id,
+        org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
+        project_id: newProj.id,
+        plot_no: p.plot_no,
+        size_cents: p.size_cents,
+        size_sqft: p.size_cents * 435.6,
+        facing: p.facing,
+        price: p.price,
+        status: p.status,
+        buyer_name: p.buyer_name,
+      }));
+
+      await supabase.from('plots').insert(plotInserts);
     } catch (e: any) {
-      console.warn('Supabase insert skipped:', e.message);
+      console.warn('Supabase project insert skipped, saved locally:', e.message);
     }
 
     return { success: true, data: newProj };
@@ -258,9 +294,54 @@ export async function createProjectAction(payload: {
 }
 
 export async function fetchProjectPlotsAction(projectId: string): Promise<PlotItem[]> {
-  const project = runtimeProjects.find((p) => p.id === projectId);
-  if (!project) return [];
-  return getOrGeneratePlots(project);
+  const localPlotsRecord = readLocalJson<Record<string, PlotItem[]>>(PLOTS_FILE, {});
+
+  try {
+    const supabase = (await createClient()) as any;
+    const { data, error } = await supabase
+      .from('plots')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('plot_no', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      // Check local cache
+      if (localPlotsRecord[projectId] && localPlotsRecord[projectId].length > 0) {
+        return localPlotsRecord[projectId];
+      }
+      // Generate initial plots if needed
+      const projects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+      const proj = projects.find((p) => p.id === projectId);
+      if (proj) {
+        const generated = generatePlotsForProject(proj);
+        localPlotsRecord[projectId] = generated;
+        writeLocalJson(PLOTS_FILE, localPlotsRecord);
+        return generated;
+      }
+      return [];
+    }
+
+    const mappedPlots: PlotItem[] = data.map((d: any) => ({
+      id: d.id,
+      project_id: d.project_id,
+      plot_no: d.plot_no,
+      size_cents: Number(d.size_cents),
+      facing: d.facing,
+      price: Number(d.price),
+      status: d.status,
+      buyer_name: d.buyer_name,
+    }));
+
+    localPlotsRecord[projectId] = mappedPlots;
+    writeLocalJson(PLOTS_FILE, localPlotsRecord);
+    return mappedPlots;
+  } catch (err: any) {
+    console.warn('Supabase fetch plots notice:', err?.message);
+    if (localPlotsRecord[projectId]) {
+      return localPlotsRecord[projectId];
+    }
+    return [];
+  }
 }
 
 export async function updatePlotStatusAction(
@@ -269,25 +350,66 @@ export async function updatePlotStatusAction(
   newStatus: PlotItem['status'],
   buyerName?: string
 ): Promise<{ success: boolean; plots?: PlotItem[]; availableCount?: number }> {
-  const plots = runtimePlots[projectId];
-  if (!plots) return { success: false };
+  try {
+    // 1. Update in local persistent storage
+    const localPlotsRecord = readLocalJson<Record<string, PlotItem[]>>(PLOTS_FILE, {});
+    let plots = localPlotsRecord[projectId];
 
-  const plotIndex = plots.findIndex((p) => p.id === plotId);
-  if (plotIndex >= 0) {
-    plots[plotIndex].status = newStatus;
-    if (buyerName) {
-      plots[plotIndex].buyer_name = buyerName;
-    } else if (newStatus === 'available') {
-      plots[plotIndex].buyer_name = null;
+    if (!plots) {
+      const projects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+      const proj = projects.find((p) => p.id === projectId);
+      plots = proj ? generatePlotsForProject(proj) : [];
+      localPlotsRecord[projectId] = plots;
     }
-  }
 
-  // Recalculate available plots
-  const availableCount = plots.filter((p) => p.status === 'available').length;
-  const projectIndex = runtimeProjects.findIndex((p) => p.id === projectId);
-  if (projectIndex >= 0) {
-    runtimeProjects[projectIndex].available_plots = availableCount;
-  }
+    const plotIndex = plots.findIndex((p) => p.id === plotId);
+    if (plotIndex >= 0) {
+      plots[plotIndex].status = newStatus;
+      if (buyerName) {
+        plots[plotIndex].buyer_name = buyerName;
+      } else if (newStatus === 'available') {
+        plots[plotIndex].buyer_name = null;
+      }
+    }
+    localPlotsRecord[projectId] = plots;
+    writeLocalJson(PLOTS_FILE, localPlotsRecord);
 
-  return { success: true, plots: [...plots], availableCount };
+    // Recalculate available plots count
+    const availableCount = plots.filter((p) => p.status === 'available').length;
+
+    // Update in local projects
+    const localProjects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
+    const pIndex = localProjects.findIndex((p) => p.id === projectId);
+    if (pIndex >= 0) {
+      localProjects[pIndex].available_plots = availableCount;
+      writeLocalJson(PROJECTS_FILE, localProjects);
+    }
+
+    // 2. Sync to Supabase
+    try {
+      const supabase = (await createClient()) as any;
+      await supabase
+        .from('plots')
+        .update({
+          status: newStatus,
+          buyer_name: newStatus === 'available' ? null : (buyerName || null),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', plotId);
+
+      await supabase
+        .from('projects')
+        .update({
+          available_plots: availableCount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', projectId);
+    } catch (e: any) {
+      console.warn('Supabase plot update skipped:', e.message);
+    }
+
+    return { success: true, plots: [...plots], availableCount };
+  } catch (err: any) {
+    return { success: false };
+  }
 }

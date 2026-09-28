@@ -14,6 +14,9 @@ import {
   Sprout,
   CheckCircle2,
   Sparkles,
+  BarChart2,
+  PieChart,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -85,30 +88,33 @@ export default function ProjectsPage() {
   const totalInventory = projects.reduce((acc, p) => acc + (p.total_plots || 0), 0);
   const availableInventory = projects.reduce((acc, p) => acc + (p.available_plots || 0), 0);
   const bookedOrSold = Math.max(0, totalInventory - availableInventory);
+  const occupancyRate = totalInventory > 0 ? Math.round((bookedOrSold / totalInventory) * 100) : 0;
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <span>Farmland Projects & Inventory</span>
-            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-200">
-              Coimbatore Agro Estates
-            </Badge>
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <span>Farmland Projects & Inventory</span>
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-300 font-mono">
+                Supabase Postgres
+              </Badge>
+            </h2>
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage farmland locations, price per cent, water/borewell infrastructure, and plot availability matrices.
+            Manage Coimbatore agro estate locations, price per cent, water/borewell infrastructure, and live plot matrices.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="outline"
             size="sm"
             onClick={loadProjects}
             disabled={isLoading}
-            className="text-xs gap-1.5"
+            className="text-xs gap-1.5 shadow-xs"
             title="Refresh projects"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -118,7 +124,7 @@ export default function ProjectsPage() {
           <Button
             size="sm"
             onClick={handleOpenCreate}
-            className="gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-medium shadow-sm"
+            className="gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-sm transition-all hover:scale-[1.02]"
           >
             <Plus className="h-4 w-4" />
             <span>+ Add New Project</span>
@@ -126,73 +132,170 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* TOP INVENTORY STATS CARDS */}
+      {/* MODERN ANIMATED INVENTORY STATS BOXES */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
-              <Trees className="h-5 w-5" />
+        {/* Card 1: Estates */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Farmland Estates
+            </span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <Trees className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Farmland Estates</p>
-              <h4 className="text-xl font-bold text-slate-900 mt-0.5">{totalProjects} Projects</h4>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
+              {totalProjects} <span className="text-sm font-sans font-medium text-slate-500">Locations</span>
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-emerald-700 mt-1 font-medium">Coimbatore Foothills & Pollachi</p>
+          </div>
+        </div>
 
-        <Card className="bg-white border-slate-200 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl">
-              <Layers className="h-5 w-5" />
+        {/* Card 2: Total Plots Master */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-400" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Total Plots Master
+            </span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-700 group-hover:scale-110 transition-transform">
+              <Layers className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Total Plots Master</p>
-              <h4 className="text-xl font-bold text-blue-700 mt-0.5">{totalInventory} Plots</h4>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-blue-800">
+              {totalInventory} <span className="text-sm font-sans font-medium text-slate-500">Plots</span>
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-blue-600 mt-1 font-medium">Recorded in Supabase Inventory</p>
+          </div>
+        </div>
 
-        <Card className="bg-white border-emerald-100 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
-              <CheckCircle2 className="h-5 w-5" />
+        {/* Card 3: Available for Sale */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-green-500" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Available for Sale
+            </span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Available for Sale</p>
-              <h4 className="text-xl font-bold text-emerald-700 mt-0.5">{availableInventory} Plots</h4>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-emerald-700">
+              {availableInventory} <span className="text-sm font-sans font-medium text-slate-500">Plots</span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-700 font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Ready for immediate registration</span>
+            </div>
+          </div>
+        </div>
 
-        <Card className="bg-white border-amber-100 shadow-sm">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl">
-              <Sparkles className="h-5 w-5" />
+        {/* Card 4: Booked / Registered */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-400" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Occupancy / Sold
+            </span>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 group-hover:scale-110 transition-transform">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Booked / Registered</p>
-              <h4 className="text-xl font-bold text-amber-700 mt-0.5">{bookedOrSold} Plots</h4>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-amber-800">
+              {occupancyRate}% <span className="text-sm font-sans font-medium text-slate-500">({bookedOrSold} Plots)</span>
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-amber-700 mt-1 font-medium">Under Token or Registry</p>
+          </div>
+        </div>
+      </div>
+
+      {/* INVENTORY DISTRIBUTION DIAGRAM */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 p-6 text-white shadow-xl border border-slate-700/60">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-700/50">
+          <div>
+            <div className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-emerald-400" />
+              <h3 className="text-sm font-semibold tracking-tight text-white uppercase font-mono">
+                Farmland Inventory Allocation & Distribution Diagram
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Live capacity and plot availability across all active project estates.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-mono">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Available ({availableInventory})
+            </span>
+            <span className="flex items-center gap-1.5 text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-amber-400" /> Booked / Sold ({bookedOrSold})
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+          {projects.map((proj) => {
+            const sold = (proj.total_plots || 0) - (proj.available_plots || 0);
+            const pct = proj.total_plots > 0 ? Math.round((sold / proj.total_plots) * 100) : 0;
+            return (
+              <div
+                key={proj.id}
+                className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:border-slate-600 transition-colors"
+              >
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="font-semibold text-xs text-white truncate max-w-[170px]" title={proj.name}>
+                    {proj.name}
+                  </span>
+                  <span className="font-mono text-xs text-emerald-400 font-bold">
+                    {formatCurrencyINR(proj.price_per_cent)}/cent
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2 font-mono">
+                  <span>{proj.available_plots} Available</span>
+                  <span>{sold} Booked ({pct}%)</span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-700/80 h-2 rounded-full overflow-hidden flex">
+                  <div
+                    className="bg-amber-400 h-full transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                    title={`Booked/Sold: ${sold} (${pct}%)`}
+                  />
+                  <div
+                    className="bg-emerald-400 h-full transition-all duration-500"
+                    style={{ width: `${100 - pct}%` }}
+                    title={`Available: ${proj.available_plots}`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* PROJECTS GRID */}
       {isLoading ? (
         <div className="p-12 text-center text-xs text-muted-foreground bg-white rounded-xl border border-slate-200">
           <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-emerald-600" />
-          <span>Loading farmland estates and plot inventories...</span>
+          <span>Synchronizing farmland estates and plot matrices from Supabase...</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => (
             <Card
               key={project.id}
-              className="overflow-hidden hover:shadow-md transition-shadow bg-white flex flex-col justify-between border-slate-200"
+              className="overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white flex flex-col justify-between border-slate-200"
             >
               <div>
                 {/* Project Header Banner */}
-                <div className="h-32 bg-emerald-900/10 p-5 flex flex-col justify-between relative border-b">
+                <div className="h-32 bg-gradient-to-r from-emerald-950/10 via-emerald-800/10 to-teal-900/10 p-5 flex flex-col justify-between relative border-b">
                   <div className="flex justify-between items-start">
                     <Badge
                       className={`capitalize text-xs font-semibold ${
@@ -211,7 +314,7 @@ export default function ProjectsPage() {
                         variant="secondary"
                         size="sm"
                         onClick={() => handleOpenEdit(project)}
-                        className="h-8 px-2.5 text-xs bg-white/90 hover:bg-white text-slate-700 shadow-xs gap-1"
+                        className="h-8 px-2.5 text-xs bg-white/90 hover:bg-white text-slate-700 shadow-xs gap-1 cursor-pointer"
                         title="Edit Project Details"
                       >
                         <Edit className="h-3.5 w-3.5 text-emerald-700" />
@@ -225,7 +328,7 @@ export default function ProjectsPage() {
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-base text-foreground leading-snug">
+                    <h3 className="font-bold text-base text-slate-900 leading-snug">
                       {project.name}
                     </h3>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -242,7 +345,7 @@ export default function ProjectsPage() {
 
                   {/* Water & Soil Highlights */}
                   {(project.water_source || project.soil_type) && (
-                    <div className="space-y-1.5 p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px]">
+                    <div className="space-y-1.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px]">
                       {project.water_source && (
                         <div className="flex items-start gap-1.5 text-slate-700">
                           <Droplets className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
@@ -258,36 +361,39 @@ export default function ProjectsPage() {
                     </div>
                   )}
 
-                  {/* Price and Plot Availability */}
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t text-xs">
-                    <div>
-                      <span className="text-muted-foreground block text-[11px]">Price / Cent</span>
-                      <span className="font-bold text-emerald-800 text-sm">
+                  {/* Price and Plot Ratio Grid */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
+                        Price Per Cent
+                      </span>
+                      <p className="text-sm font-bold font-mono text-emerald-700 mt-0.5">
                         {formatCurrencyINR(project.price_per_cent)}
-                      </span>
+                      </p>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground block text-[11px]">Availability</span>
-                      <span className="font-bold text-foreground text-sm">
-                        <span className="text-emerald-700 font-extrabold">{project.available_plots}</span>
-                        <span className="text-muted-foreground font-normal"> / {project.total_plots} plots</span>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
+                        Availability
                       </span>
+                      <p className="text-sm font-bold font-mono text-slate-800 mt-0.5">
+                        <span className="text-emerald-700">{project.available_plots}</span>
+                        <span className="text-slate-400 font-normal"> / {project.total_plots}</span>
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </div>
 
-              {/* Action Buttons Footer */}
-              <div className="p-5 pt-0 flex gap-2">
+              {/* Action Buttons */}
+              <div className="p-5 pt-0">
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => handleOpenMatrix(project)}
-                  className="w-full text-xs gap-1.5 bg-emerald-50/50 hover:bg-emerald-100/70 border-emerald-200 text-emerald-900 font-semibold"
+                  className="w-full text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white gap-2 shadow-sm transition-all hover:scale-[1.01] cursor-pointer"
                 >
-                  <Layers className="h-3.5 w-3.5 text-emerald-700" />
-                  <span>View Plot Availability Matrix</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>Open Interactive Plot Matrix</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 ml-auto" />
                 </Button>
               </div>
             </Card>
@@ -295,7 +401,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* EDIT / CREATE PROJECT MODAL */}
+      {/* Edit Project Modal */}
       <EditProjectModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -303,13 +409,18 @@ export default function ProjectsPage() {
         onSaved={handleProjectSaved}
       />
 
-      {/* PLOT MATRIX & INVENTORY MODAL */}
-      <PlotMatrixModal
-        isOpen={isMatrixModalOpen}
-        onClose={() => setIsMatrixModalOpen(false)}
-        project={selectedProjectForMatrix}
-        onProjectUpdated={handleProjectSaved}
-      />
+      {/* Interactive Plot Matrix Modal */}
+      {selectedProjectForMatrix && (
+        <PlotMatrixModal
+          isOpen={isMatrixModalOpen}
+          onClose={() => setIsMatrixModalOpen(false)}
+          project={selectedProjectForMatrix}
+          onProjectUpdated={(updatedProject) => {
+            handleProjectSaved(updatedProject);
+            loadProjects();
+          }}
+        />
+      )}
     </div>
   );
 }

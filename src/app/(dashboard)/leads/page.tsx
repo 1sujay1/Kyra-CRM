@@ -16,6 +16,10 @@ import {
   Trash2,
   Shield,
   Loader2,
+  Webhook,
+  Database,
+  ArrowUpRight,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +37,8 @@ import { maskPhone } from '@/lib/security/phone';
 import { StatusChangeModal, LeadStatusType } from '@/components/leads/status-change-modal';
 import { Lead360Drawer, LeadDetailed, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
 import { NewLeadModal } from '@/components/leads/new-lead-modal';
+import { LeadPipelineDiagram } from '@/components/leads/lead-pipeline-diagram';
+import { WebhookSimulatorModal } from '@/components/leads/webhook-simulator-modal';
 import {
   fetchLeadsAction,
   updateLeadStatusAction,
@@ -58,6 +64,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [selectedStageFilter, setSelectedStageFilter] = useState<string>('all');
   const [revealedPhones, setRevealedPhones] = useState<Record<string, boolean>>({});
   const [userRole, setUserRole] = useState<'admin' | 'digital_marketing'>('admin');
   const [currentUsername, setCurrentUsername] = useState<string>('Adminkyra');
@@ -73,7 +80,10 @@ export default function LeadsPage() {
   // New Lead Modal State
   const [newLeadModalOpen, setNewLeadModalOpen] = useState(false);
 
-  // Load from Supabase on mount
+  // Webhook Ingestion & SQL Setup Modal State
+  const [webhookModalOpen, setWebhookModalOpen] = useState(false);
+
+  // Load from Supabase / Persistent cache on mount
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -88,7 +98,7 @@ export default function LeadsPage() {
           setCurrentUsername(user.username);
         }
       } catch (err) {
-        console.error('Failed to load leads from Supabase', err);
+        console.error('Failed to load leads:', err);
       } finally {
         setLoading(false);
       }
@@ -140,7 +150,7 @@ export default function LeadsPage() {
       })
     );
 
-    // 2. Persist to Supabase
+    // 2. Persist to Supabase and local cache
     await updateLeadStatusAction(leadId, newStatus, comment);
   };
 
@@ -164,6 +174,11 @@ export default function LeadsPage() {
     await createLeadAction(newLead);
   };
 
+  // Ingested via Webhook Modal / API Handler
+  const handleWebhookLeadIngested = (ingestedLead: LeadDetailed) => {
+    setLeads((prev) => [ingestedLead, ...prev]);
+  };
+
   // Delete Lead Handler (STRICTLY Admin Only)
   const handleDeleteLead = async (e: React.MouseEvent, leadId: string) => {
     e.stopPropagation();
@@ -173,7 +188,7 @@ export default function LeadsPage() {
       return;
     }
 
-    const confirmDelete = window.confirm('Are you sure you want to delete this lead? This action is logged.');
+    const confirmDelete = window.confirm('Are you sure you want to delete this lead? This action is permanently logged.');
     if (!confirmDelete) return;
 
     // Remove from UI
@@ -182,7 +197,7 @@ export default function LeadsPage() {
       setDrawerOpen(false);
     }
 
-    // Persist soft-delete to Supabase
+    // Persist soft-delete to Supabase & persistent cache
     const res = await deleteLeadAction(leadId);
     if (!res.success) {
       alert(res.error || 'Failed to delete lead.');
@@ -234,14 +249,23 @@ export default function LeadsPage() {
     document.body.removeChild(link);
   };
 
+  // Filtered Leads
   const filteredLeads = leads.filter((lead) => {
     const matchesSearch =
       lead.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.phone.includes(searchTerm) ||
       lead.project_name.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesSource =
       selectedSource === 'all' || lead.source === selectedSource;
-    return matchesSearch && matchesSource;
+
+    const matchesStage =
+      selectedStageFilter === 'all' ||
+      (selectedStageFilter === 'site_visit'
+        ? lead.status === 'site_visit_scheduled' || lead.status === 'site_visit_completed'
+        : lead.status === selectedStageFilter);
+
+    return matchesSearch && matchesSource && matchesStage;
   });
 
   return (
@@ -250,35 +274,49 @@ export default function LeadsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Farmland Leads Pipeline
+            <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <span>Farmland Leads Pipeline</span>
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-800 border-emerald-300 font-mono">
+                Supabase Connected
+              </Badge>
             </h2>
             <Badge
               variant={userRole === 'admin' ? 'default' : 'secondary'}
-              className="text-[10px] uppercase font-mono tracking-wider ml-2"
+              className="text-[10px] uppercase font-mono tracking-wider ml-1"
             >
-              {userRole === 'admin' ? 'Admin (Full Access + Delete)' : 'Digital Marketing (Modify Only)'}
+              {userRole === 'admin' ? 'Admin (Full Access)' : 'Digital Marketing (Modify Only)'}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Supabase Postgres connected: Real-time Meta Lead Ads, Google Ads, and walk-in enquiries.
+            Real-time Meta Lead Ads, Google Ads, and walk-in enquiries synchronized with Supabase Postgres.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWebhookModalOpen(true)}
+            className="gap-2 text-xs border-slate-300 hover:bg-slate-100 shadow-xs"
+          >
+            <Webhook className="h-4 w-4 text-emerald-600" />
+            <span>Webhook & DB Setup</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
-            className="gap-2 text-xs hover:bg-slate-100"
+            className="gap-2 text-xs hover:bg-slate-100 shadow-xs"
           >
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
           </Button>
+
           <Button
             size="sm"
             onClick={() => setNewLeadModalOpen(true)}
-            className="gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
+            className="gap-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-medium shadow-sm transition-all hover:scale-[1.02]"
           >
             <Plus className="h-4 w-4" />
             <span>+ New Lead</span>
@@ -286,84 +324,112 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* MODERN ANIMATED STATS BOXES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-emerald-100 bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {/* Card 1: Total Leads */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-emerald-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Total Active Leads
-            </CardTitle>
-            <Users className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{leads.length}</div>
-            <p className="text-xs text-emerald-600 font-medium mt-1">
-              {leads.filter((l) => l.quality === 'hot').length} Hot Leads requiring follow-up
-            </p>
-          </CardContent>
-        </Card>
+            </span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <Users className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
+              {leads.length}
+            </div>
+            <div className="flex items-center gap-1.5 mt-1 text-xs font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{leads.filter((l) => l.quality === 'hot').length} Hot priority buyers</span>
+            </div>
+          </div>
+        </div>
 
-        <Card className="border-blue-100 bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {/* Card 2: Meta Lead Ads */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-blue-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-400" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Meta Lead Ads
-            </CardTitle>
-            <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
-              v21.0 Webhook
+            </span>
+            <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-mono">
+              Graph API
             </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
               {leads.filter((l) => l.source === 'meta').length}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Anaikatti & Siruvani campaigns</p>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-slate-500 mt-1">Anaikatti & Siruvani adsets</p>
+          </div>
+        </div>
 
-        <Card className="border-amber-100 bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {/* Card 3: Google Ads Leads */}
+        <div className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-amber-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-400" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Google Ads Leads
-            </CardTitle>
-            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
-              Search Lead Forms
+            </span>
+            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-mono">
+              Search Forms
             </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-slate-900">
               {leads.filter((l) => l.source === 'google').length}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Pollachi & Coimbatore keywords</p>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-slate-500 mt-1">Pollachi & Coimbatore search</p>
+          </div>
+        </div>
 
-        <Card className="border-purple-100 bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Site Visits Booked
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {leads.filter((l) => l.status === 'site_visit_scheduled').length}
+        {/* Card 4: Webhook Ingested Leads */}
+        <div
+          onClick={() => setWebhookModalOpen(true)}
+          className="group relative overflow-hidden rounded-2xl bg-white p-5 border border-purple-100 shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Webhooks & APIs
+            </span>
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:scale-110 transition-transform">
+              <Webhook className="h-4 w-4" />
             </div>
-            <p className="text-xs text-purple-600 font-medium mt-1">Pickup from Gandhipuram / Airport</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-bold font-mono tracking-tight text-purple-900">
+              {leads.filter((l) => l.source === 'webhook' || l.source === 'zapier').length}
+            </div>
+            <div className="flex items-center justify-between text-xs text-purple-700 mt-1 font-medium">
+              <span>POST /api/webhooks/leads</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* INTERACTIVE PIPELINE CONVERSION DIAGRAM */}
+      <LeadPipelineDiagram
+        leads={leads}
+        selectedStatus={selectedStageFilter}
+        onSelectStatus={setSelectedStageFilter}
+      />
+
       {/* Filter and Search Bar */}
-      <Card className="shadow-sm">
+      <Card className="shadow-xs border-slate-200">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by buyer name, phone, project..."
+                placeholder="Search buyer name, phone, project..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 text-xs"
+                className="pl-9 text-xs bg-slate-50/50"
               />
             </div>
 
@@ -371,209 +437,278 @@ export default function LeadsPage() {
               <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mr-1">
                 <Filter className="h-3.5 w-3.5" /> Source:
               </span>
-              {(['all', 'meta', 'google', 'walk_in'] as const).map((source) => (
+              {(['all', 'meta', 'google', 'webhook', 'walk_in', 'manual'] as const).map((source) => (
                 <Button
                   key={source}
                   variant={selectedSource === source ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedSource(source)}
-                  className="text-xs h-8 capitalize"
+                  className={`text-xs h-8 capitalize cursor-pointer ${
+                    selectedSource === source ? 'bg-emerald-700 text-white' : ''
+                  }`}
                 >
                   {source === 'all' ? 'All Sources' : source}
                 </Button>
               ))}
+
+              {selectedStageFilter !== 'all' && (
+                <Badge
+                  variant="secondary"
+                  className="text-xs bg-emerald-100 text-emerald-800 ml-2 cursor-pointer hover:bg-emerald-200"
+                  onClick={() => setSelectedStageFilter('all')}
+                  title="Click to clear stage filter"
+                >
+                  Stage: {selectedStageFilter} ✕
+                </Badge>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Leads Table */}
-      <Card className="shadow-sm overflow-hidden">
+      <Card className="shadow-xs border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-12 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-700" />
-            <span>Connecting to Supabase Database...</span>
+          <div className="p-14 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
+            <Loader2 className="h-7 w-7 animate-spin text-emerald-700" />
+            <span className="font-medium text-slate-700">Synchronizing leads with Supabase Database...</span>
           </div>
         ) : (
-          <Table>
-            <TableHeader className="bg-slate-50">
-              <TableRow>
-                <TableHead className="font-semibold text-xs">Buyer</TableHead>
-                <TableHead className="font-semibold text-xs">Phone (Masked)</TableHead>
-                <TableHead className="font-semibold text-xs">Farmland Project</TableHead>
-                <TableHead className="font-semibold text-xs">Source / Campaign</TableHead>
-                <TableHead className="font-semibold text-xs">Purpose & Budget</TableHead>
-                <TableHead className="font-semibold text-xs">Quality</TableHead>
-                <TableHead className="font-semibold text-xs">
-                  Status <span className="text-[10px] font-normal text-muted-foreground">(Click to Change)</span>
-                </TableHead>
-                <TableHead className="font-semibold text-xs">Assigned To</TableHead>
-                <TableHead className="font-semibold text-xs text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLeads.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-16 text-muted-foreground text-xs">
-                    <div className="flex flex-col items-center justify-center gap-2.5">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                        <Users className="h-5 w-5" />
-                      </div>
-                      <p className="font-bold text-slate-800 text-sm">No Leads in Pipeline</p>
-                      <p className="text-slate-500 max-w-sm">
-                        Preloaded demo leads have been removed. Click &quot;+ New Lead&quot; to register your first real farmland buyer enquiry or receive incoming ad leads.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={() => setNewLeadModalOpen(true)}
-                        className="mt-2 text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>+ New Lead</span>
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableHead className="font-semibold text-xs text-slate-700">Buyer</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">Phone</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">Farmland Project</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">Source / Channel</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">Purpose & Budget</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">Quality</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">
+                    Status <span className="text-[10px] font-normal text-muted-foreground">(Click to Change)</span>
+                  </TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700">Executive</TableHead>
+                  <TableHead className="font-semibold text-xs text-slate-700 text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredLeads.map((lead) => {
-                  const isRevealed = revealedPhones[lead.id];
-                  return (
-                    <TableRow
-                      key={lead.id}
-                      onClick={() => handleOpen360(lead)}
-                      className="hover:bg-slate-50/70 transition-colors cursor-pointer"
-                    >
-                      {/* Buyer details without DPDP text */}
-                    <TableCell>
-                      <div>
-                        <div className="font-semibold text-sm text-foreground hover:text-emerald-700 transition-colors">
-                          {lead.full_name}
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-16 text-muted-foreground text-xs">
+                      <div className="flex flex-col items-center justify-center gap-2.5">
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <Users className="h-6 w-6" />
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {lead.city} • {lead.email}
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    {/* Masked Phone with reveal trigger */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-slate-700 font-medium">
-                          {isRevealed ? lead.phone : maskPhone(lead.phone)}
-                        </span>
-                        {!isRevealed && (
-                          <button
-                            onClick={(e) => handleRevealPhone(e, lead.id)}
-                            title="Click to reveal phone number (logged in audit trail)"
-                            className="p-1 rounded text-muted-foreground hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <span className="font-medium text-xs text-foreground">{lead.project_name}</span>
-                    </TableCell>
-
-                    <TableCell>
-                      <div>
-                        <Badge
-                          variant={
-                            lead.source === 'meta'
-                              ? 'info'
-                              : lead.source === 'google'
-                              ? 'warning'
-                              : 'secondary'
-                          }
-                          className="text-[10px] capitalize font-medium"
-                        >
-                          {lead.source}
-                        </Badge>
-                        {lead.campaign_name && (
-                          <p className="text-[10px] text-muted-foreground truncate max-w-[130px] mt-0.5" title={lead.campaign_name}>
-                            {lead.campaign_name}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="text-xs">
-                        <span className="capitalize font-medium text-foreground">{lead.purpose}</span>
-                        <p className="text-[11px] text-muted-foreground">{lead.budget_range}</p>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge
-                        variant={
-                          lead.quality === 'hot'
-                            ? 'destructive'
-                            : lead.quality === 'warm'
-                            ? 'warning'
-                            : 'secondary'
-                        }
-                        className="text-[10px] uppercase font-bold"
-                      >
-                        {lead.quality}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Interactive Status Pill - Click to Change Status with Comment! */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => handleOpenStatusModal(e, lead)}
-                        title="Click to change status and log comment to database"
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all cursor-pointer shadow-sm hover:scale-[1.03] ${
-                          statusBadgeStyles[lead.status] || 'bg-slate-100 text-slate-800'
-                        }`}
-                      >
-                        <span>{lead.status.replace(/_/g, ' ')}</span>
-                        <Edit className="h-2.5 w-2.5 opacity-60" />
-                      </button>
-                    </TableCell>
-
-                    <TableCell>
-                      <span className="text-xs text-slate-700 font-medium">{lead.assigned_to_name}</span>
-                    </TableCell>
-
-                    {/* Actions: Lead 360 + Admin-Only Delete */}
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpen360(lead)}
-                          className="h-7 text-xs px-2.5 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
-                        >
-                          Lead 360
-                        </Button>
-
-                        {/* ONLY Admin has Delete Permission */}
-                        {userRole === 'admin' && (
+                        <p className="font-bold text-slate-800 text-sm">No Leads Found in this Pipeline Filter</p>
+                        <p className="text-slate-500 max-w-sm text-xs">
+                          Click &quot;+ New Lead&quot; to manually add an enquiry or use &quot;Webhook & DB Setup&quot; to test instant incoming leads.
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
                           <Button
-                            variant="outline"
                             size="sm"
-                            onClick={(e) => handleDeleteLead(e, lead.id)}
-                            title="Delete Lead (Admin Only)"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:border-destructive/30"
+                            onClick={() => setNewLeadModalOpen(true)}
+                            className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>+ New Lead</span>
                           </Button>
-                        )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setWebhookModalOpen(true)}
+                            className="text-xs gap-1.5"
+                          >
+                            <Webhook className="h-3.5 w-3.5 text-purple-600" />
+                            <span>Simulate Webhook Lead</span>
+                          </Button>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
-                );
-              }))}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredLeads.map((lead) => {
+                    const isRevealed = revealedPhones[lead.id];
+                    return (
+                      <TableRow
+                        key={lead.id}
+                        onClick={() => handleOpen360(lead)}
+                        className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
+                      >
+                        {/* Buyer details */}
+                        <TableCell>
+                          <div>
+                            <div className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
+                              {lead.full_name}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span>{lead.city}</span>
+                              {lead.email && (
+                                <>
+                                  <span>•</span>
+                                  <span className="truncate max-w-[120px]">{lead.email}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Phone with Unmask */}
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs text-slate-800">
+                              {isRevealed ? lead.phone : maskPhone(lead.phone)}
+                            </span>
+                            {!isRevealed && (
+                              <button
+                                onClick={(e) => handleRevealPhone(e, lead.id)}
+                                className="text-muted-foreground hover:text-slate-900 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                                title="Click to view full phone"
+                              >
+                                <Eye className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Farmland Project */}
+                        <TableCell>
+                          <div className="font-medium text-xs text-slate-800">
+                            {lead.project_name}
+                          </div>
+                        </TableCell>
+
+                        {/* Source / Campaign */}
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] font-mono capitalize ${
+                                lead.source === 'meta'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : lead.source === 'google'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : lead.source === 'webhook'
+                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {lead.source}
+                            </Badge>
+                            {lead.campaign_name && (
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[110px]" title={lead.campaign_name}>
+                                {lead.campaign_name}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Purpose & Budget */}
+                        <TableCell>
+                          <div>
+                            <div className="font-mono text-xs font-semibold text-slate-900">
+                              {lead.budget_range}
+                            </div>
+                            <div className="text-[10px] capitalize text-muted-foreground mt-0.5">
+                              {lead.purpose}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Quality */}
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                              lead.quality === 'hot'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : lead.quality === 'warm'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                lead.quality === 'hot'
+                                  ? 'bg-rose-500 animate-ping'
+                                  : lead.quality === 'warm'
+                                  ? 'bg-amber-500'
+                                  : 'bg-slate-400'
+                              }`}
+                            />
+                            {lead.quality}
+                          </span>
+                        </TableCell>
+
+                        {/* Status (Clickable for Status Change) */}
+                        <TableCell onClick={(e) => handleOpenStatusModal(e, lead)}>
+                          <button
+                            type="button"
+                            className={`px-2.5 py-1 rounded-lg border text-xs font-medium capitalize flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                              statusBadgeStyles[lead.status] || 'bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
+                            title="Click to advance status"
+                          >
+                            <span>{lead.status.replace(/_/g, ' ')}</span>
+                            <Edit className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+                          </button>
+                        </TableCell>
+
+                        {/* Executive */}
+                        <TableCell>
+                          <span className="text-xs text-slate-700 font-medium">
+                            {lead.assigned_to_name}
+                          </span>
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpen360(lead)}
+                              className="h-7 w-7 p-0 text-slate-500 hover:text-emerald-700"
+                              title="View Lead 360"
+                            >
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                            </Button>
+
+                            {userRole === 'admin' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => handleDeleteLead(e, lead.id)}
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
+                                title="Delete Lead (Admin Only)"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </Card>
 
-      {/* 1. Status Change Modal with Mandatory Comment */}
+      {/* Modals & Drawers */}
+      {selectedLeadFor360 && (
+        <Lead360Drawer
+          lead={selectedLeadFor360}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          onUpdateLead={handleUpdateLead}
+          onOpenStatusModal={() => {
+            setTargetLeadForStatus(selectedLeadFor360);
+            setStatusModalOpen(true);
+          }}
+        />
+      )}
+
       {targetLeadForStatus && (
         <StatusChangeModal
           open={statusModalOpen}
@@ -585,25 +720,16 @@ export default function LeadsPage() {
         />
       )}
 
-      {/* 2. Detailed Lead 360 Drawer */}
-      <Lead360Drawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        lead={selectedLeadFor360}
-        onUpdateLead={handleUpdateLead}
-        onOpenStatusModal={() => {
-          if (selectedLeadFor360) {
-            setTargetLeadForStatus(selectedLeadFor360);
-            setStatusModalOpen(true);
-          }
-        }}
-      />
-
-      {/* 3. New Lead Modal */}
       <NewLeadModal
         open={newLeadModalOpen}
         onOpenChange={setNewLeadModalOpen}
         onLeadCreated={handleLeadCreated}
+      />
+
+      <WebhookSimulatorModal
+        isOpen={webhookModalOpen}
+        onClose={() => setWebhookModalOpen(false)}
+        onLeadIngested={handleWebhookLeadIngested}
       />
     </div>
   );

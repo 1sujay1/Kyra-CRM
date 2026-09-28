@@ -30,6 +30,7 @@ import {
   History,
 } from 'lucide-react';
 import { LeadStatusType } from './status-change-modal';
+import { createSiteVisitAction } from '@/lib/site-visits/actions';
 
 export interface StatusHistoryItem {
   id: string;
@@ -165,8 +166,26 @@ export function Lead360Drawer({
     setActiveTab('timeline');
   };
 
-  const handleScheduleVisit = (e: React.FormEvent) => {
+  const handleScheduleVisit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!lead) return;
+
+    try {
+      await createSiteVisitAction({
+        lead_id: lead.id,
+        visitor_name: lead.full_name,
+        visitor_phone: lead.phone,
+        visitor_email: lead.email,
+        project_name: lead.project_name,
+        scheduled_at: newVisit.date,
+        pickup_required: newVisit.pickup_required,
+        pickup_location: newVisit.pickup_required ? newVisit.pickup_location : null,
+        notes: newVisit.notes,
+      });
+    } catch (err) {
+      console.warn('Could not schedule visit action:', err);
+    }
+
     const visitActivity: ActivityItem = {
       id: `visit-${Date.now()}`,
       type: 'site_visit',

@@ -36,6 +36,7 @@ import { maskPhone } from '@/lib/security/phone';
 import { StatusChangeModal, LeadStatusType } from '@/components/leads/status-change-modal';
 import { Lead360Drawer, LeadDetailed, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
 import { NewLeadModal } from '@/components/leads/new-lead-modal';
+import { ScheduleVisitModal } from '@/components/site-visits/schedule-visit-modal';
 import { LeadPipelineDiagram } from '@/components/leads/lead-pipeline-diagram';
 import {
   fetchLeadsAction,
@@ -70,6 +71,17 @@ export default function LeadsPage() {
   // Status Change Modal State
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [targetLeadForStatus, setTargetLeadForStatus] = useState<LeadDetailed | null>(null);
+
+  // Schedule Visit Modal State (Auto-opened when status is marked site_visit_scheduled)
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleVisitLead, setScheduleVisitLead] = useState<{
+    id: string;
+    full_name: string;
+    phone: string;
+    email?: string | null;
+    project_name: string;
+  } | null>(null);
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
 
   // Lead 360 Drawer State
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -117,6 +129,7 @@ export default function LeadsPage() {
   // Status Change Handler with Persistence
   const handleStatusChanged = async (leadId: string, newStatus: LeadStatusType, comment: string) => {
     // 1. Optimistic UI update
+    let targetUpdatedLead: LeadDetailed | null = null;
     setLeads((prev) =>
       prev.map((lead) => {
         if (lead.id === leadId) {
@@ -135,6 +148,8 @@ export default function LeadsPage() {
             status_history: [newHistoryItem, ...lead.status_history],
           };
 
+          targetUpdatedLead = updated;
+
           if (selectedLeadFor360?.id === leadId) {
             setSelectedLeadFor360(updated);
           }
@@ -145,8 +160,45 @@ export default function LeadsPage() {
       })
     );
 
-    // 2. Persist update
+    // 2. Persist update in database
     await updateLeadStatusAction(leadId, newStatus, comment);
+
+    // 3. AUTOMATIC SCHEDULE SITE VISIT POPUP:
+    // If marked as 'site_visit_scheduled', automatically launch the Schedule Visit modal
+    if (newStatus === 'site_visit_scheduled') {
+      const selected = targetUpdatedLead || leads.find((l) => l.id === leadId);
+      if (selected) {
+        setScheduleVisitLead({
+          id: selected.id,
+          full_name: selected.full_name,
+          phone: selected.phone,
+          email: selected.email,
+          project_name: selected.project_name,
+        });
+        setScheduleModalOpen(true);
+      }
+    }
+  };
+
+  // Called when site visit is submitted and saved
+  const handleSiteVisitCreated = (newVisit: any) => {
+    setScheduleSuccessMsg(
+      `Site visit successfully scheduled for ${newVisit.visitor_name} at ${newVisit.project_name} on ${new Date(newVisit.scheduled_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}! Automatically updated on Site Visits Schedule.`
+    );
+    setTimeout(() => setScheduleSuccessMsg(null), 9000);
+  };
+
+  // Direct schedule visit trigger from table row
+  const handleDirectScheduleVisit = (e: React.MouseEvent, lead: LeadDetailed) => {
+    e.stopPropagation();
+    setScheduleVisitLead({
+      id: lead.id,
+      full_name: lead.full_name,
+      phone: lead.phone,
+      email: lead.email,
+      project_name: lead.project_name,
+    });
+    setScheduleModalOpen(true);
   };
 
   // Lead 360 Update Handler
@@ -269,6 +321,24 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Schedule Success Feedback Alert */}
+      {scheduleSuccessMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded-md bg-emerald-100 text-emerald-800">
+              <CalendarCheck className="h-4 w-4" />
+            </div>
+            <span className="font-semibold">{scheduleSuccessMsg}</span>
+          </div>
+          <button
+            onClick={() => setScheduleSuccessMsg(null)}
+            className="text-emerald-700 hover:text-emerald-900 font-bold text-sm px-1.5 py-0.5 rounded hover:bg-emerald-100 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Banner & Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -651,6 +721,16 @@ export default function LeadsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={(e) => handleDirectScheduleVisit(e, lead)}
+                              className="h-7 w-7 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-50 cursor-pointer"
+                              title="Schedule Farmland Site Visit"
+                            >
+                              <CalendarCheck className="h-3.5 w-3.5" />
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleOpen360(lead)}
                               className="h-7 w-7 p-0 text-slate-500 hover:text-emerald-700 cursor-pointer"
                               title="View Lead 360"
@@ -710,6 +790,21 @@ export default function LeadsPage() {
         open={newLeadModalOpen}
         onOpenChange={setNewLeadModalOpen}
         onLeadCreated={handleLeadCreated}
+      />
+
+      {/* Auto-Triggered Schedule Farmland Site Visit Modal */}
+      <ScheduleVisitModal
+        isOpen={scheduleModalOpen}
+        onClose={() => setScheduleModalOpen(false)}
+        onCreated={handleSiteVisitCreated}
+        leads={leads.map((l) => ({
+          id: l.id,
+          full_name: l.full_name,
+          phone: l.phone,
+          email: l.email,
+          project_name: l.project_name,
+        }))}
+        preselectedLead={scheduleVisitLead}
       />
     </div>
   );

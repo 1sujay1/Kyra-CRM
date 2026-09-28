@@ -25,6 +25,13 @@ interface ScheduleVisitModalProps {
     email?: string | null;
     project_name: string;
   }>;
+  preselectedLead?: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email?: string | null;
+    project_name: string;
+  } | null;
 }
 
 export function ScheduleVisitModal({
@@ -32,6 +39,7 @@ export function ScheduleVisitModal({
   onClose,
   onCreated,
   leads = [],
+  preselectedLead,
 }: ScheduleVisitModalProps) {
   // Default to tomorrow 10:30 AM
   const tomorrow = new Date();
@@ -54,6 +62,19 @@ export function ScheduleVisitModal({
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Auto-fill when preselectedLead is passed or modal opens
+  React.useEffect(() => {
+    if (preselectedLead && isOpen) {
+      setSelectedLeadId(preselectedLead.id);
+      setVisitorName(preselectedLead.full_name);
+      setVisitorPhone(preselectedLead.phone);
+      setVisitorEmail(preselectedLead.email || '');
+      if (preselectedLead.project_name) {
+        setProjectName(preselectedLead.project_name);
+      }
+    }
+  }, [preselectedLead, isOpen]);
 
   const handleLeadChange = (leadId: string) => {
     setSelectedLeadId(leadId);

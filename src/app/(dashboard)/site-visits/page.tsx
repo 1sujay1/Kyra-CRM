@@ -18,6 +18,7 @@ import {
   Compass,
   Building,
   RefreshCw,
+  Download,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +121,58 @@ export default function SiteVisitsPage() {
     return matchesSearch && matchesStatus && matchesProject;
   });
 
+  // Export Report as CSV (compatible with Excel, Sheets)
+  const handleExportCSV = () => {
+    if (filteredVisits.length === 0) {
+      alert('No site visit records found matching current filters to export.');
+      return;
+    }
+
+    const headers = [
+      'Visitor Name',
+      'Contact Phone',
+      'Contact Email',
+      'Farmland Project',
+      'Scheduled Date & Time (IST)',
+      'Pickup Required',
+      'Pickup Location',
+      'Driver Name',
+      'Vehicle Number',
+      'Assigned Executive',
+      'Visit Status',
+      'Customer Interest Level',
+      'Plots Inspected',
+      'Feedback & Notes',
+    ];
+
+    const rows = filteredVisits.map((v) => [
+      `"${(v.visitor_name || '').replace(/"/g, '""')}"`,
+      `"${(v.visitor_phone || '').replace(/"/g, '""')}"`,
+      `"${(v.visitor_email || '').replace(/"/g, '""')}"`,
+      `"${(v.project_name || '').replace(/"/g, '""')}"`,
+      `"${new Date(v.scheduled_at).toLocaleString('en-IN')}"`,
+      v.pickup_required ? 'Yes' : 'No',
+      `"${(v.pickup_location || 'N/A').replace(/"/g, '""')}"`,
+      `"${(v.driver_name || 'N/A').replace(/"/g, '""')}"`,
+      `"${(v.vehicle_number || 'N/A').replace(/"/g, '""')}"`,
+      `"${(v.assigned_executive || '').replace(/"/g, '""')}"`,
+      (v.status || '').toUpperCase(),
+      (v.interest_level || 'N/A').toUpperCase(),
+      `"${(v.plots_shown || []).join('; ')}"`,
+      `"${(v.feedback || v.notes || '').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Kyra_Site_Visits_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -137,6 +190,17 @@ export default function SiteVisitsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+            className="text-xs gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs"
+            title="Download CSV report of scheduled site visits"
+          >
+            <Download className="h-3.5 w-3.5 text-emerald-700" />
+            <span>Export Report</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"

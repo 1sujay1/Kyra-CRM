@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUserAction } from '@/lib/auth/actions';
+import { readLocalJson, writeLocalJson } from '@/lib/storage';
 
 export interface SiteVisitItem {
   id: string;
@@ -25,33 +26,122 @@ export interface SiteVisitItem {
   updated_at: string;
 }
 
-// In-memory runtime cache for seamless session resilience if Supabase table is pending migration
-let runtimeSiteVisits: SiteVisitItem[] = [];
+const VISITS_STORE_KEY = 'site_visits.json';
+
+const DEFAULT_SITE_VISITS: SiteVisitItem[] = [
+  {
+    id: 'sv-101',
+    visitor_name: 'Karthik Raja',
+    visitor_phone: '+919842109876',
+    visitor_email: 'karthik.raja@gmail.com',
+    project_name: 'Pollachi Coconut Groves',
+    scheduled_at: new Date(Date.now() + 86400000).toISOString(),
+    pickup_required: true,
+    pickup_location: 'Coimbatore International Airport (CJB)',
+    driver_name: 'Murugan (Innova Crysta)',
+    vehicle_number: 'TN 38 BK 4901',
+    assigned_executive: 'Priya Raman',
+    status: 'scheduled',
+    feedback: null,
+    interest_level: null,
+    plots_shown: ['Plot 02', 'Plot 03'],
+    notes: 'Arriving by Indigo 6E-542 from Chennai. Needs farm gate pickup.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'sv-102',
+    visitor_name: 'Dr. Anand S',
+    visitor_phone: '+919443219876',
+    visitor_email: 'dranand.ortho@outlook.com',
+    project_name: 'Anaikatti Green Acres',
+    scheduled_at: new Date(Date.now() + 172800000).toISOString(),
+    pickup_required: false,
+    pickup_location: null,
+    driver_name: null,
+    vehicle_number: null,
+    assigned_executive: 'Suresh Narayanan',
+    status: 'scheduled',
+    feedback: null,
+    interest_level: null,
+    plots_shown: ['Plot 07', 'Plot 14'],
+    notes: 'Interested in mountain-facing boundary plots for weekend natural farming retreat.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'sv-103',
+    visitor_name: 'Lakshmi Narayanan',
+    visitor_phone: '+919894012345',
+    visitor_email: 'lakshminarayanan@yahoo.co.in',
+    project_name: 'Siruvani Valley Farmlands',
+    scheduled_at: new Date(Date.now() - 86400000).toISOString(),
+    pickup_required: true,
+    pickup_location: 'Coimbatore Junction Railway Station (CBE)',
+    driver_name: 'Selvakumar',
+    vehicle_number: 'TN 37 CB 1122',
+    assigned_executive: 'Priya Raman',
+    status: 'completed',
+    feedback: 'Loved the sweet Siruvani water taste (TDS 45) and mountain view. Requested price calculation for 50 cents plot.',
+    interest_level: 'hot',
+    plots_shown: ['Plot 05', 'Plot 08', 'Plot 11'],
+    notes: 'Completed tour on time. Follow-up scheduled for plot agreement.',
+    created_at: new Date(Date.now() - 90000000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
 
 export async function fetchSiteVisitsAction(): Promise<SiteVisitItem[]> {
   try {
+    const localVisits = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
     const supabase = (await createClient()) as any;
+
+    let dbVisits: SiteVisitItem[] = [];
+
+    // 1. Try fetching from site_visits table
     const { data, error } = await supabase
       .from('site_visits')
       .select('*')
       .order('scheduled_at', { ascending: false });
 
-    if (error) {
-      console.warn('Supabase site_visits query returned error (using runtime state):', error.message);
-      return runtimeSiteVisits;
+    if (!error && data && data.length > 0) {
+      dbVisits = data;
+    } else {
+      // 2. Resilient fallback: fetch from webhook_logs where source = 'site_visit'
+      try {
+        const { data: logVisits } = await supabase
+          .from('webhook_logs')
+          .select('payload')
+          .eq('source', 'site_visit')
+          .order('created_at', { ascending: false });
+
+        if (logVisits && logVisits.length > 0) {
+          dbVisits = logVisits.map((l: any) => l.payload as SiteVisitItem).filter(Boolean);
+        }
+      } catch {
+        // ignore
+      }
     }
 
-    if (data && data.length > 0) {
-      // Merge with runtime state (preferring DB items)
-      const dbIds = new Set(data.map((d: any) => d.id));
-      const unsavedRuntime = runtimeSiteVisits.filter((r) => !dbIds.has(r.id));
-      return [...data, ...unsavedRuntime];
+    // Merge DB + Local visits, de-duplicating by id
+    const allVisitsMap = new Map<string, SiteVisitItem>();
+
+    for (const v of localVisits) {
+      if (v?.id) allVisitsMap.set(v.id, v);
+    }
+    for (const v of dbVisits) {
+      if (v?.id) allVisitsMap.set(v.id, v);
     }
 
-    return runtimeSiteVisits;
+    const merged = Array.from(allVisitsMap.values()).sort(
+      (a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
+    );
+
+    writeLocalJson(VISITS_STORE_KEY, merged);
+    return merged;
   } catch (err: any) {
     console.error('Error fetching site visits:', err);
-    return runtimeSiteVisits;
+    return readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
   }
 }
 
@@ -83,7 +173,9 @@ export async function createSiteVisitAction(payload: {
       project_name: payload.project_name,
       scheduled_at: payload.scheduled_at,
       pickup_required: payload.pickup_required,
-      pickup_location: payload.pickup_required ? payload.pickup_location || 'Coimbatore International Airport (CJB)' : null,
+      pickup_location: payload.pickup_required
+        ? payload.pickup_location || 'Coimbatore International Airport (CJB)'
+        : null,
       driver_name: payload.driver_name?.trim() || null,
       vehicle_number: payload.vehicle_number?.trim() || null,
       assigned_executive: payload.assigned_executive || 'Priya Raman',
@@ -96,10 +188,11 @@ export async function createSiteVisitAction(payload: {
       updated_at: new Date().toISOString(),
     };
 
-    // Store in runtime state
-    runtimeSiteVisits.unshift(newVisit);
+    // 1. Persist immediately to local storage
+    const existing = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
+    writeLocalJson(VISITS_STORE_KEY, [newVisit, ...existing]);
 
-    // Save to Supabase
+    // 2. Persist to Supabase
     try {
       const supabase = (await createClient()) as any;
       const { error: insertError } = await supabase.from('site_visits').insert([
@@ -124,11 +217,19 @@ export async function createSiteVisitAction(payload: {
         },
       ]);
 
+      // If site_visits table not created yet, persist to webhook_logs
       if (insertError) {
-        console.warn('Could not insert to Supabase site_visits table directly:', insertError.message);
+        await supabase.from('webhook_logs').insert([
+          {
+            source: 'site_visit',
+            lead_id: newVisit.lead_id,
+            status: 'processed',
+            payload: newVisit,
+          },
+        ]);
       }
 
-      // If tied to a lead, update lead status & append activity
+      // If linked to lead, synchronize lead status, activities, and history
       if (newVisit.lead_id) {
         await supabase
           .from('leads')
@@ -138,28 +239,32 @@ export async function createSiteVisitAction(payload: {
           })
           .eq('id', newVisit.lead_id);
 
-        await supabase.from('activities').insert([
-          {
-            lead_id: newVisit.lead_id,
-            type: 'site_visit',
-            outcome: 'Site Visit Scheduled',
-            notes: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleString('en-IN')} at ${newVisit.project_name}.${newVisit.pickup_required ? ` Pickup: ${newVisit.pickup_location}` : ''}`,
-            created_by: userDisplay,
-          },
-        ]);
+        try {
+          await supabase.from('activities').insert([
+            {
+              lead_id: newVisit.lead_id,
+              type: 'site_visit',
+              outcome: 'Site Visit Scheduled',
+              notes: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleString('en-IN')} at ${newVisit.project_name}.${newVisit.pickup_required ? ` Pickup: ${newVisit.pickup_location}` : ''}`,
+              created_by: userDisplay,
+            },
+          ]);
 
-        await supabase.from('lead_status_history').insert([
-          {
-            lead_id: newVisit.lead_id,
-            from_status: 'qualified',
-            to_status: 'site_visit_scheduled',
-            comment: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleDateString('en-IN')}`,
-            changed_by: userDisplay,
-          },
-        ]);
+          await supabase.from('lead_status_history').insert([
+            {
+              lead_id: newVisit.lead_id,
+              from_status: 'qualified',
+              to_status: 'site_visit_scheduled',
+              comment: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleDateString('en-IN')}`,
+              changed_by: userDisplay,
+            },
+          ]);
+        } catch {
+          // ignore sub-table errors
+        }
       }
     } catch (e: any) {
-      console.warn('Supabase sync skipped, retained in memory:', e.message);
+      console.warn('Supabase site visit sync warning:', e.message);
     }
 
     return { success: true, data: newVisit };
@@ -182,24 +287,26 @@ export async function updateSiteVisitReportAction(
     const currentUser = await getCurrentUserAction();
     const userDisplay = currentUser?.username || 'Adminkyra';
 
-    // Update in runtime memory
-    const existingIndex = runtimeSiteVisits.findIndex((v) => v.id === visitId);
+    // 1. Update in local storage
+    const visits = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
+    const existingIndex = visits.findIndex((v) => v.id === visitId);
     let targetVisit: SiteVisitItem | undefined;
 
     if (existingIndex >= 0) {
-      runtimeSiteVisits[existingIndex] = {
-        ...runtimeSiteVisits[existingIndex],
+      visits[existingIndex] = {
+        ...visits[existingIndex],
         status: payload.status,
         feedback: payload.feedback?.trim() || null,
         interest_level: payload.interest_level || null,
-        plots_shown: payload.plots_shown || runtimeSiteVisits[existingIndex].plots_shown,
-        notes: payload.notes?.trim() || runtimeSiteVisits[existingIndex].notes,
+        plots_shown: payload.plots_shown || visits[existingIndex].plots_shown,
+        notes: payload.notes?.trim() || visits[existingIndex].notes,
         updated_at: new Date().toISOString(),
       };
-      targetVisit = runtimeSiteVisits[existingIndex];
+      targetVisit = visits[existingIndex];
+      writeLocalJson(VISITS_STORE_KEY, visits);
     }
 
-    // Update in Supabase
+    // 2. Update in Supabase
     try {
       const supabase = (await createClient()) as any;
       const { data: updatedDb, error: updateError } = await supabase
@@ -233,19 +340,21 @@ export async function updateSiteVisitReportAction(
             })
             .eq('id', linkedLeadId);
 
-          await supabase.from('activities').insert([
-            {
-              lead_id: linkedLeadId,
-              type: 'site_visit',
-              outcome: `Site Visit Completed - Interest: ${(payload.interest_level || 'warm').toUpperCase()}`,
-              notes: `Customer Feedback: "${payload.feedback || 'Tour completed smoothly.'}". Plots inspected: ${(payload.plots_shown || []).join(', ') || 'N/A'}.`,
-              created_by: userDisplay,
-            },
-          ]);
+          try {
+            await supabase.from('activities').insert([
+              {
+                lead_id: linkedLeadId,
+                type: 'site_visit',
+                outcome: `Site Visit Completed - Interest: ${(payload.interest_level || 'warm').toUpperCase()}`,
+                notes: `Customer Feedback: "${payload.feedback || 'Tour completed smoothly.'}". Plots inspected: ${(payload.plots_shown || []).join(', ') || 'N/A'}.`,
+                created_by: userDisplay,
+              },
+            ]);
+          } catch {}
         }
       }
     } catch (e: any) {
-      console.warn('Supabase update warning:', e.message);
+      console.warn('Supabase site visit update warning:', e.message);
     }
 
     return { success: true, data: targetVisit };
@@ -264,7 +373,9 @@ export async function deleteSiteVisitAction(visitId: string): Promise<{ success:
       };
     }
 
-    runtimeSiteVisits = runtimeSiteVisits.filter((v) => v.id !== visitId);
+    const visits = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
+    const filtered = visits.filter((v) => v.id !== visitId);
+    writeLocalJson(VISITS_STORE_KEY, filtered);
 
     try {
       const supabase = (await createClient()) as any;

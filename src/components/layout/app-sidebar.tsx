@@ -32,25 +32,25 @@ export function AppSidebar({
       title: 'Leads Pipeline',
       href: '/leads',
       icon: Users,
-      roles: ['admin', 'manager', 'sales_executive', 'channel_partner'],
+      roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
     },
     {
       title: 'Farmland Projects',
       href: '/projects',
       icon: Trees,
-      roles: ['admin', 'manager', 'sales_executive', 'channel_partner'],
+      roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
     },
     {
       title: 'Site Visits',
       href: '/site-visits',
       icon: CalendarCheck,
-      roles: ['admin', 'manager', 'sales_executive'],
+      roles: ['admin', 'manager', 'sales_executive', 'digital_marketing'],
     },
     {
       title: 'Bookings',
       href: '/bookings',
       icon: CreditCard,
-      roles: ['admin', 'manager', 'sales_executive'],
+      roles: ['admin', 'manager', 'sales_executive', 'digital_marketing'],
     },
   ];
 

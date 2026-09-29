@@ -50,6 +50,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, PermissionAction[]> = {
     'bookings:approve',
     'audit_logs:view',
   ],
+  digital_marketing: [
+    'leads:view_all',
+    'leads:view_assigned',
+    'leads:create',
+    'leads:update',
+    'reports:view',
+    'ad_spend:manage',
+  ],
   manager: [
     'leads:view_all',
     'leads:view_assigned',

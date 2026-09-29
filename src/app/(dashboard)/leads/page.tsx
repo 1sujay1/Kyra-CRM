@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Users,
   Search,
@@ -534,7 +535,10 @@ export default function LeadsPage() {
         </div>
 
         {/* Card 4: Site Visits */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+        <Link
+          href="/site-visits"
+          className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 block cursor-pointer"
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -549,11 +553,11 @@ export default function LeadsPage() {
               {leads.filter((l) => l.status === 'site_visit_scheduled' || l.status === 'site_visit_completed').length}
             </div>
             <div className="flex items-center justify-between text-[11px] text-purple-700 mt-1 font-medium">
-              <span>{leads.filter((l) => l.status === 'booked').length} Booked / Sold</span>
+              <span>View Site Visits Schedule</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* ENHANCED INTERACTIVE PIPELINE CONVERSION DIAGRAM */}

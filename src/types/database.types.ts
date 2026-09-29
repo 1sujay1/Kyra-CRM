@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type UserRole = 'admin' | 'manager' | 'sales_executive' | 'channel_partner';
+export type UserRole = 'admin' | 'digital_marketing' | 'manager' | 'sales_executive' | 'channel_partner';
 export type ProjectStatus = 'upcoming' | 'active' | 'sold_out' | 'archived';
 export type PlotStatus = 'available' | 'blocked' | 'booked' | 'sold';
 export type PlotFacing = 'north' | 'south' | 'east' | 'west' | 'north_east' | 'north_west' | 'south_east' | 'south_west';

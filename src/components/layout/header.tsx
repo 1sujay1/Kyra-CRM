@@ -18,6 +18,7 @@ interface HeaderProps {
 
 const roleBadgeVariantMap: Record<UserRole, 'default' | 'success' | 'warning' | 'info'> = {
   admin: 'default',
+  digital_marketing: 'info',
   manager: 'info',
   sales_executive: 'success',
   channel_partner: 'warning',

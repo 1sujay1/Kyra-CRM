@@ -1,20 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Lock, User, ShieldAlert, ArrowRight, ShieldCheck, KeyRound, Check } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Lock, User, ShieldAlert, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginAction } from '@/lib/auth/actions';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const reason = searchParams.get('reason');
 
-  const [identifier, setIdentifier] = useState('Adminkyra');
-  const [password, setPassword] = useState('Kyra@1234#');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -37,12 +36,6 @@ function LoginForm() {
       setErrorMessage('Server authentication error. Please try again.');
       setLoading(false);
     }
-  };
-
-  const handleQuickSelect = (username: string) => {
-    setIdentifier(username);
-    setPassword('Kyra@1234#');
-    setErrorMessage(null);
   };
 
   return (
@@ -70,50 +63,6 @@ function LoginForm() {
         </div>
       )}
 
-      {/* Quick Account Selector Chips */}
-      <div className="space-y-1.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-        <span className="text-[11px] font-semibold text-slate-700 block">
-          Authorized Kyra Accounts (Click to autofill):
-        </span>
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => handleQuickSelect('Adminkyra')}
-            className={`p-2 rounded-lg border text-left text-xs transition-all ${
-              identifier.toLowerCase().includes('admin')
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold ring-1 ring-emerald-400'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span>Adminkyra</span>
-              <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-200 text-emerald-800 font-bold uppercase">
-                Admin
-              </span>
-            </div>
-            <span className="text-[10px] text-muted-foreground block mt-0.5">Full Access + Delete</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickSelect('dmkyra')}
-            className={`p-2 rounded-lg border text-left text-xs transition-all ${
-              identifier.toLowerCase().includes('dm')
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold ring-1 ring-emerald-400'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span>dmkyra</span>
-              <span className="text-[9px] px-1 py-0.5 rounded bg-blue-100 text-blue-800 font-bold uppercase">
-                Marketing
-              </span>
-            </div>
-            <span className="text-[10px] text-muted-foreground block mt-0.5">Modify & Add Only</span>
-          </button>
-        </div>
-      </div>
-
       <form onSubmit={handleLogin} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="identifier" className="text-xs font-semibold">
@@ -124,7 +73,7 @@ function LoginForm() {
             <Input
               id="identifier"
               type="text"
-              placeholder="Adminkyra or dmkyra"
+              placeholder="Username or email"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
@@ -139,7 +88,6 @@ function LoginForm() {
             <Label htmlFor="password" className="text-xs font-semibold">
               Password
             </Label>
-            <span className="text-[10px] text-emerald-700 font-mono">Kyra@1234#</span>
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />

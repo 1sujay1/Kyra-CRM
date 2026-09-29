@@ -17,7 +17,7 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
     const supabase = (await createClient()) as any;
     const { data: dbLeads, error } = await supabase
       .from('leads')
-      .select('*')
+      .select('*, lead_status_history(*), activities(*)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
@@ -26,10 +26,38 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
       return localLeads;
     }
 
-    if (dbLeads && dbLeads.length > 0) {
+    if (dbLeads && Array.isArray(dbLeads)) {
       const mappedDbLeads: LeadDetailed[] = dbLeads.map((l: any) => {
-        // Find existing local lead to preserve status_history and activities
+        // Map database status history
+        const dbHistory: StatusHistoryItem[] = Array.isArray(l.lead_status_history)
+          ? l.lead_status_history.map((sh: any) => ({
+              id: sh.id,
+              from_status: sh.from_status || null,
+              to_status: sh.to_status,
+              comment: sh.comment || '',
+              changed_by: sh.changed_by || 'System',
+              created_at: sh.created_at,
+            })).sort((a: StatusHistoryItem, b: StatusHistoryItem) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          : [];
+
+        // Map database activities
+        const dbActivities: ActivityItem[] = Array.isArray(l.activities)
+          ? l.activities.map((act: any) => ({
+              id: act.id,
+              type: act.type || 'note',
+              outcome: act.outcome || '',
+              notes: act.notes || '',
+              created_by: act.created_by || 'System',
+              created_at: act.created_at,
+            })).sort((a: ActivityItem, b: ActivityItem) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          : [];
+
         const local = localLeads.find((item) => item.id === l.id);
+
         return {
           id: l.id,
           full_name: l.full_name,
@@ -45,18 +73,14 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
           quality: l.quality || 'warm',
           assigned_to_name: l.assigned_to_name || 'Priya Raman',
           created_at: l.created_at,
-          status_history: local?.status_history || [],
-          activities: local?.activities || [],
+          status_history: dbHistory.length > 0 ? dbHistory : (local?.status_history || []),
+          activities: dbActivities.length > 0 ? dbActivities : (local?.activities || []),
         };
       });
 
-      // Merge any locally created leads that haven't synced to DB yet
-      const dbIds = new Set(mappedDbLeads.map((m) => m.id));
-      const unSyncedLocals = localLeads.filter((loc) => !dbIds.has(loc.id));
-      const merged = [...unSyncedLocals, ...mappedDbLeads];
-
-      writeLocalJson(LEADS_FILE, merged);
-      return merged;
+      // Update local storage cache to be an exact mirror of active database leads
+      writeLocalJson(LEADS_FILE, mappedDbLeads);
+      return mappedDbLeads;
     }
 
     return localLeads;
@@ -111,6 +135,34 @@ export async function createLeadAction(newLead: LeadDetailed): Promise<{ success
 
       if (insertError) {
         console.error('[Supabase Lead Insert Notice]:', insertError.message);
+      } else {
+        // Persist initial status history in Supabase
+        if (newLead.status_history && newLead.status_history.length > 0) {
+          for (const hist of newLead.status_history) {
+            await supabase.from('lead_status_history').insert({
+              org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
+              lead_id: newLead.id,
+              from_status: hist.from_status || null,
+              to_status: hist.to_status,
+              comment: hist.comment || 'Lead created',
+              changed_by: hist.changed_by || 'Current User',
+            });
+          }
+        }
+
+        // Persist initial activities in Supabase
+        if (newLead.activities && newLead.activities.length > 0) {
+          for (const act of newLead.activities) {
+            await supabase.from('activities').insert({
+              org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
+              lead_id: newLead.id,
+              type: act.type,
+              outcome: act.outcome || '',
+              notes: act.notes,
+              created_by: act.created_by || 'Current User',
+            });
+          }
+        }
       }
     } catch (e: any) {
       console.warn('[Supabase Connection Notice]:', e.message);
@@ -248,13 +300,28 @@ export async function deleteLeadAction(leadId: string): Promise<{ success: boole
 
   try {
     const supabase = (await createClient()) as any;
+
+    // 1. Clean up child records linked to this lead to prevent orphan references or FK blocks
+    await Promise.allSettled([
+      supabase.from('lead_status_history').delete().eq('lead_id', leadId),
+      supabase.from('activities').delete().eq('lead_id', leadId),
+      supabase.from('webhook_logs').delete().eq('lead_id', leadId),
+      supabase.from('site_visits').delete().eq('lead_id', leadId),
+    ]);
+
+    // 2. Perform complete removal from the Supabase leads database table
     const { error: dbError } = await supabase
       .from('leads')
-      .update({ deleted_at: new Date().toISOString() })
+      .delete()
       .eq('id', leadId);
 
     if (dbError) {
-      console.warn('Supabase lead delete warning:', dbError.message);
+      console.warn('Supabase lead delete notice:', dbError.message);
+      // Fallback: If soft-delete is enforced by policy, mark deleted_at
+      await supabase
+        .from('leads')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', leadId);
     }
 
     return { success: true };

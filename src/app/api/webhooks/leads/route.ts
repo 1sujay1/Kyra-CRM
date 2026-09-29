@@ -212,6 +212,25 @@ export async function POST(req: NextRequest) {
 
       if (!insertError) {
         dbSuccess = true;
+
+        // Persist initial status log in Supabase
+        await supabase.from('lead_status_history').insert({
+          org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
+          lead_id: newLead.id,
+          to_status: newLead.status,
+          comment: statusComment,
+          changed_by: `Webhook Ingestion (${source.toUpperCase()})`,
+        });
+
+        // Persist initial activity note in Supabase
+        await supabase.from('activities').insert({
+          org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
+          lead_id: newLead.id,
+          type: 'note',
+          outcome: newLead.status === 'number_not_valid' ? 'Invalid Phone Number' : newLead.status === 'duplicate_number' ? 'Duplicate Number Detected' : 'Lead Captured via Webhook',
+          notes: `${statusComment}. Campaign: ${campaignName}`,
+          created_by: `Webhook (${source.toUpperCase()})`,
+        });
       } else {
         console.warn('[Webhook] Notice saving to Supabase (saved in persistent store):', insertError.message);
       }

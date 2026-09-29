@@ -49,7 +49,7 @@ export function ManageVisitModal({
   onClose,
   onUpdated,
   onDeleted,
-  userRole = 'admin',
+  userRole = 'digital_marketing',
 }: ManageVisitModalProps) {
   const [status, setStatus] = useState<SiteVisitItem['status']>('scheduled');
   const [feedback, setFeedback] = useState<string>('');
@@ -107,6 +107,11 @@ export function ManageVisitModal({
   };
 
   const handleDelete = async () => {
+    if (userRole !== 'admin') {
+      alert('ACCESS DENIED: Only Admin (Adminkyra) has permission to delete site visits.');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this site visit record? This action cannot be undone.')) {
       return;
     }

@@ -28,11 +28,13 @@ import {
   fetchProjectsAction,
   deleteProjectAction,
 } from '@/lib/projects/actions';
+import { getCurrentUserAction } from '@/lib/auth/actions';
 import { EditProjectModal } from '@/components/projects/edit-project-modal';
 import { PlotMatrixModal } from '@/components/projects/plot-matrix-modal';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<FarmlandProjectItem[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('digital_marketing');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Modals state
@@ -45,8 +47,14 @@ export default function ProjectsPage() {
   const loadProjects = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchProjectsAction();
+      const [data, user] = await Promise.all([
+        fetchProjectsAction(),
+        getCurrentUserAction(),
+      ]);
       setProjects(data);
+      if (user?.role) {
+        setCurrentUserRole(user.role);
+      }
     } catch (err) {
       console.error('Failed to load projects:', err);
     } finally {
@@ -89,6 +97,11 @@ export default function ProjectsPage() {
 
   const handleDeleteProject = async (e: React.MouseEvent, project: FarmlandProjectItem) => {
     e.stopPropagation();
+
+    if (currentUserRole !== 'admin') {
+      alert('ACCESS DENIED: Only Admin (Adminkyra) has permission to delete projects.');
+      return;
+    }
 
     const confirmed = window.confirm(
       `Are you sure you want to delete "${project.name}"?\n\nThis will remove the project and its plot inventory from the system and server database.`
@@ -367,17 +380,19 @@ export default function ProjectsPage() {
                         <span>Edit</span>
                       </Button>
 
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) => handleDeleteProject(e, project)}
-                        disabled={deletingProjectId === project.id}
-                        className="h-8 px-2.5 text-xs bg-white/90 hover:bg-red-50 text-red-600 hover:text-red-700 hover:border-red-200 shadow-xs gap-1 cursor-pointer transition-colors"
-                        title="Delete Project and Plot Inventory from Server"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-red-600" />
-                        <span>Delete</span>
-                      </Button>
+                      {currentUserRole === 'admin' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => handleDeleteProject(e, project)}
+                          disabled={deletingProjectId === project.id}
+                          className="h-8 px-2.5 text-xs bg-white/90 hover:bg-red-50 text-red-600 hover:text-red-700 hover:border-red-200 shadow-xs gap-1 cursor-pointer transition-colors"
+                          title="Delete Project and Plot Inventory from Server (Admin Only)"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          <span>Delete</span>
+                        </Button>
+                      )}
 
                       <div className="h-8 w-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center shadow-xs">
                         <Trees className="h-4 w-4" />

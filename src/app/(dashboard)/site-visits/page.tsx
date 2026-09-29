@@ -33,7 +33,7 @@ import { getCurrentUserAction } from '@/lib/auth/actions';
 export default function SiteVisitsPage() {
   const [siteVisits, setSiteVisits] = useState<SiteVisitItem[]>([]);
   const [leadsList, setLeadsList] = useState<Array<{ id: string; full_name: string; phone: string; email?: string | null; project_name: string }>>([]);
-  const [currentUserRole, setCurrentUserRole] = useState<string>('admin');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('digital_marketing');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Modals state

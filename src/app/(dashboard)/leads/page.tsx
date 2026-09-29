@@ -79,7 +79,7 @@ export default function LeadsPage() {
   const [selectedStageFilter, setSelectedStageFilter] = useState<string>('all');
   const [revealedPhones, setRevealedPhones] = useState<Record<string, boolean>>({});
   const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<'admin' | 'digital_marketing'>('admin');
+  const [userRole, setUserRole] = useState<'admin' | 'digital_marketing'>('digital_marketing');
   const [currentUsername, setCurrentUsername] = useState<string>('Adminkyra');
 
   // Status Change Modal State

@@ -158,6 +158,14 @@ export async function deleteProjectAction(
   projectId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const currentUser = await getCurrentUserAction();
+    if (!currentUser || currentUser.role !== 'admin') {
+      return {
+        success: false,
+        error: 'ACCESS DENIED: Only Admin (Adminkyra) has permission to delete projects.',
+      };
+    }
+
     // 1. Remove from local persistent storage
     const localProjects = readLocalJson<FarmlandProjectItem[]>(PROJECTS_FILE, DEFAULT_PROJECTS);
     const updatedProjects = localProjects.filter((p) => p.id !== projectId);

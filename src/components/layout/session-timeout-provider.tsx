@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { logoutAction } from '@/lib/auth/actions';
 
 interface SessionTimeoutProviderProps {
   children: React.ReactNode;
@@ -33,8 +33,7 @@ export function SessionTimeoutProvider({
       if (inactiveDuration >= timeoutMs) {
         clearInterval(interval);
         try {
-          const supabase = createClient();
-          await supabase.auth.signOut();
+          await logoutAction();
         } catch (e) {
           // ignore error on timeout
         }

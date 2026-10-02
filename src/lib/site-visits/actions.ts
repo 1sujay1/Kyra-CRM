@@ -1,8 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getDatabase } from '@/lib/mongodb';
 import { getCurrentUserAction } from '@/lib/auth/actions';
-import { readLocalJson, writeLocalJson } from '@/lib/storage';
 
 export interface SiteVisitItem {
   id: string;
@@ -26,62 +25,60 @@ export interface SiteVisitItem {
   updated_at: string;
 }
 
-const VISITS_STORE_KEY = 'site_visits.json';
-
-// Zero mock data: Only real customer site visits from status changes or manual scheduling appear
-const DEFAULT_SITE_VISITS: SiteVisitItem[] = [];
-
 export async function fetchSiteVisitsAction(): Promise<SiteVisitItem[]> {
   try {
-    const localVisits = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
-    const supabase = (await createClient()) as any;
+    const db = await getDatabase();
 
-    let dbVisits: SiteVisitItem[] = [];
+    // 1. Fetch from site_visits collection
+    const data = await db
+      .collection('site_visits')
+      .find({})
+      .sort({ scheduled_at: -1 })
+      .toArray();
 
-    // 1. Try fetching from site_visits table
-    const { data, error } = await supabase
-      .from('site_visits')
-      .select('*')
-      .order('scheduled_at', { ascending: false });
+    if (data && data.length > 0) {
+      return data.map((d: any) => ({
+        id: d.id || d._id.toString(),
+        lead_id: d.lead_id || null,
+        visitor_name: d.visitor_name,
+        visitor_phone: d.visitor_phone,
+        visitor_email: d.visitor_email || null,
+        project_name: d.project_name,
+        scheduled_at: d.scheduled_at,
+        pickup_required: Boolean(d.pickup_required),
+        pickup_location: d.pickup_location || null,
+        driver_name: d.driver_name || null,
+        vehicle_number: d.vehicle_number || null,
+        assigned_executive: d.assigned_executive || 'Priya Raman',
+        status: d.status || 'scheduled',
+        feedback: d.feedback || null,
+        interest_level: d.interest_level || null,
+        plots_shown: d.plots_shown || [],
+        notes: d.notes || null,
+        created_at: d.created_at,
+        updated_at: d.updated_at,
+      }));
+    }
 
-    if (!error && data && data.length > 0) {
-      dbVisits = data;
-    } else {
-      // 2. Resilient fallback: fetch from webhook_logs where source = 'site_visit'
-      try {
-        const { data: logVisits } = await supabase
-          .from('webhook_logs')
-          .select('payload')
-          .eq('source', 'site_visit')
-          .order('created_at', { ascending: false });
+    // 2. Resilient fallback: fetch from webhook_logs where source = 'site_visit'
+    try {
+      const logVisits = await db
+        .collection('webhook_logs')
+        .find({ source: 'site_visit' })
+        .sort({ created_at: -1 })
+        .toArray();
 
-        if (logVisits && logVisits.length > 0) {
-          dbVisits = logVisits.map((l: any) => l.payload as SiteVisitItem).filter(Boolean);
-        }
-      } catch {
-        // ignore
+      if (logVisits && logVisits.length > 0) {
+        return logVisits.map((l: any) => l.payload as SiteVisitItem).filter(Boolean);
       }
+    } catch {
+      // ignore
     }
 
-    // Merge DB + Local visits, de-duplicating by id
-    const allVisitsMap = new Map<string, SiteVisitItem>();
-
-    for (const v of localVisits) {
-      if (v?.id) allVisitsMap.set(v.id, v);
-    }
-    for (const v of dbVisits) {
-      if (v?.id) allVisitsMap.set(v.id, v);
-    }
-
-    const merged = Array.from(allVisitsMap.values()).sort(
-      (a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
-    );
-
-    writeLocalJson(VISITS_STORE_KEY, merged);
-    return merged;
+    return [];
   } catch (err: any) {
-    console.error('Error fetching site visits:', err);
-    return readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
+    console.error('Error fetching site visits from MongoDB:', err);
+    return [];
   }
 }
 
@@ -128,83 +125,59 @@ export async function createSiteVisitAction(payload: {
       updated_at: new Date().toISOString(),
     };
 
-    // 1. Persist immediately to local storage
-    const existing = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
-    writeLocalJson(VISITS_STORE_KEY, [newVisit, ...existing]);
+    const db = await getDatabase();
+    await db.collection('site_visits').insertOne({
+      id: newVisit.id,
+      lead_id: newVisit.lead_id,
+      visitor_name: newVisit.visitor_name,
+      visitor_phone: newVisit.visitor_phone,
+      visitor_email: newVisit.visitor_email,
+      project_name: newVisit.project_name,
+      scheduled_at: newVisit.scheduled_at,
+      pickup_required: newVisit.pickup_required,
+      pickup_location: newVisit.pickup_location,
+      driver_name: newVisit.driver_name,
+      vehicle_number: newVisit.vehicle_number,
+      assigned_executive: newVisit.assigned_executive,
+      status: 'scheduled',
+      feedback: null,
+      interest_level: null,
+      plots_shown: newVisit.plots_shown,
+      notes: newVisit.notes,
+      created_at: newVisit.created_at,
+      updated_at: newVisit.updated_at,
+    });
 
-    // 2. Persist to Supabase
-    try {
-      const supabase = (await createClient()) as any;
-      const { error: insertError } = await supabase.from('site_visits').insert([
-        {
-          id: newVisit.id,
+    // If linked to lead, synchronize lead status, activities, and history in MongoDB
+    if (newVisit.lead_id) {
+      await db.collection('leads').updateOne(
+        { id: newVisit.lead_id },
+        { $set: { status: 'site_visit_scheduled', updated_at: new Date().toISOString() } }
+      );
+
+      try {
+        await db.collection('activities').insertOne({
+          id: `act-${Date.now()}`,
           lead_id: newVisit.lead_id,
-          visitor_name: newVisit.visitor_name,
-          visitor_phone: newVisit.visitor_phone,
-          visitor_email: newVisit.visitor_email,
-          project_name: newVisit.project_name,
-          scheduled_at: newVisit.scheduled_at,
-          pickup_required: newVisit.pickup_required,
-          pickup_location: newVisit.pickup_location,
-          driver_name: newVisit.driver_name,
-          vehicle_number: newVisit.vehicle_number,
-          assigned_executive: newVisit.assigned_executive,
-          status: 'scheduled',
-          feedback: null,
-          interest_level: null,
-          plots_shown: newVisit.plots_shown,
-          notes: newVisit.notes,
-        },
-      ]);
+          type: 'site_visit',
+          outcome: 'Site Visit Scheduled',
+          notes: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleString('en-IN')} at ${newVisit.project_name}.${newVisit.pickup_required ? ` Pickup: ${newVisit.pickup_location}` : ''}`,
+          created_by: userDisplay,
+          created_at: new Date().toISOString(),
+        });
 
-      // If site_visits table not created yet, persist to webhook_logs
-      if (insertError) {
-        await supabase.from('webhook_logs').insert([
-          {
-            source: 'site_visit',
-            lead_id: newVisit.lead_id,
-            status: 'processed',
-            payload: newVisit,
-          },
-        ]);
+        await db.collection('lead_status_history').insertOne({
+          id: `sh-${Date.now()}`,
+          lead_id: newVisit.lead_id,
+          from_status: 'qualified',
+          to_status: 'site_visit_scheduled',
+          comment: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleDateString('en-IN')}`,
+          changed_by: userDisplay,
+          created_at: new Date().toISOString(),
+        });
+      } catch {
+        // ignore sub-table errors
       }
-
-      // If linked to lead, synchronize lead status, activities, and history
-      if (newVisit.lead_id) {
-        await supabase
-          .from('leads')
-          .update({
-            status: 'site_visit_scheduled',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', newVisit.lead_id);
-
-        try {
-          await supabase.from('activities').insert([
-            {
-              lead_id: newVisit.lead_id,
-              type: 'site_visit',
-              outcome: 'Site Visit Scheduled',
-              notes: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleString('en-IN')} at ${newVisit.project_name}.${newVisit.pickup_required ? ` Pickup: ${newVisit.pickup_location}` : ''}`,
-              created_by: userDisplay,
-            },
-          ]);
-
-          await supabase.from('lead_status_history').insert([
-            {
-              lead_id: newVisit.lead_id,
-              from_status: 'qualified',
-              to_status: 'site_visit_scheduled',
-              comment: `Site visit scheduled for ${new Date(newVisit.scheduled_at).toLocaleDateString('en-IN')}`,
-              changed_by: userDisplay,
-            },
-          ]);
-        } catch {
-          // ignore sub-table errors
-        }
-      }
-    } catch (e: any) {
-      console.warn('Supabase site visit sync warning:', e.message);
     }
 
     return { success: true, data: newVisit };
@@ -227,74 +200,73 @@ export async function updateSiteVisitReportAction(
     const currentUser = await getCurrentUserAction();
     const userDisplay = currentUser?.username || 'Adminkyra';
 
-    // 1. Update in local storage
-    const visits = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
-    const existingIndex = visits.findIndex((v) => v.id === visitId);
-    let targetVisit: SiteVisitItem | undefined;
+    const db = await getDatabase();
+    const updatedAt = new Date().toISOString();
 
-    if (existingIndex >= 0) {
-      visits[existingIndex] = {
-        ...visits[existingIndex],
-        status: payload.status,
-        feedback: payload.feedback?.trim() || null,
-        interest_level: payload.interest_level || null,
-        plots_shown: payload.plots_shown || visits[existingIndex].plots_shown,
-        notes: payload.notes?.trim() || visits[existingIndex].notes,
-        updated_at: new Date().toISOString(),
-      };
-      targetVisit = visits[existingIndex];
-      writeLocalJson(VISITS_STORE_KEY, visits);
-    }
-
-    // 2. Update in Supabase
-    try {
-      const supabase = (await createClient()) as any;
-      const { data: updatedDb, error: updateError } = await supabase
-        .from('site_visits')
-        .update({
+    await db.collection('site_visits').updateOne(
+      { id: visitId },
+      {
+        $set: {
           status: payload.status,
           feedback: payload.feedback?.trim() || null,
           interest_level: payload.interest_level || null,
           plots_shown: payload.plots_shown || [],
           notes: payload.notes?.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', visitId)
-        .select()
-        .single();
-
-      if (!updateError && updatedDb) {
-        targetVisit = updatedDb;
+          updated_at: updatedAt,
+        },
       }
+    );
 
-      // If marked completed and has a linked lead, update lead
-      const linkedLeadId = targetVisit?.lead_id;
-      if (linkedLeadId) {
-        if (payload.status === 'completed') {
-          await supabase
-            .from('leads')
-            .update({
-              status: payload.interest_level === 'booked' ? 'booked' : 'site_visit_completed',
-              quality: payload.interest_level === 'hot' ? 'hot' : payload.interest_level === 'warm' ? 'warm' : undefined,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', linkedLeadId);
-
-          try {
-            await supabase.from('activities').insert([
-              {
-                lead_id: linkedLeadId,
-                type: 'site_visit',
-                outcome: `Site Visit Completed - Interest: ${(payload.interest_level || 'warm').toUpperCase()}`,
-                notes: `Customer Feedback: "${payload.feedback || 'Tour completed smoothly.'}". Plots inspected: ${(payload.plots_shown || []).join(', ') || 'N/A'}.`,
-                created_by: userDisplay,
-              },
-            ]);
-          } catch {}
+    const updatedDoc = await db.collection('site_visits').findOne({ id: visitId });
+    const targetVisit: SiteVisitItem | undefined = updatedDoc
+      ? {
+          id: updatedDoc.id,
+          lead_id: updatedDoc.lead_id,
+          visitor_name: updatedDoc.visitor_name,
+          visitor_phone: updatedDoc.visitor_phone,
+          visitor_email: updatedDoc.visitor_email,
+          project_name: updatedDoc.project_name,
+          scheduled_at: updatedDoc.scheduled_at,
+          pickup_required: updatedDoc.pickup_required,
+          pickup_location: updatedDoc.pickup_location,
+          driver_name: updatedDoc.driver_name,
+          vehicle_number: updatedDoc.vehicle_number,
+          assigned_executive: updatedDoc.assigned_executive,
+          status: updatedDoc.status,
+          feedback: updatedDoc.feedback,
+          interest_level: updatedDoc.interest_level,
+          plots_shown: updatedDoc.plots_shown,
+          notes: updatedDoc.notes,
+          created_at: updatedDoc.created_at,
+          updated_at: updatedDoc.updated_at,
         }
-      }
-    } catch (e: any) {
-      console.warn('Supabase site visit update warning:', e.message);
+      : undefined;
+
+    // If marked completed and has a linked lead, update lead in MongoDB
+    const linkedLeadId = targetVisit?.lead_id;
+    if (linkedLeadId && payload.status === 'completed') {
+      await db.collection('leads').updateOne(
+        { id: linkedLeadId },
+        {
+          $set: {
+            status: payload.interest_level === 'booked' ? 'booked' : 'site_visit_completed',
+            quality: payload.interest_level === 'hot' ? 'hot' : payload.interest_level === 'warm' ? 'warm' : undefined,
+            updated_at: updatedAt,
+          },
+        }
+      );
+
+      try {
+        await db.collection('activities').insertOne({
+          id: `act-${Date.now()}`,
+          lead_id: linkedLeadId,
+          type: 'site_visit',
+          outcome: `Site Visit Completed - Interest: ${(payload.interest_level || 'warm').toUpperCase()}`,
+          notes: `Customer Feedback: "${payload.feedback || 'Tour completed smoothly.'}". Plots inspected: ${(payload.plots_shown || []).join(', ') || 'N/A'}.`,
+          created_by: userDisplay,
+          created_at: updatedAt,
+        });
+      } catch {}
     }
 
     return { success: true, data: targetVisit };
@@ -313,16 +285,8 @@ export async function deleteSiteVisitAction(visitId: string): Promise<{ success:
       };
     }
 
-    const visits = readLocalJson<SiteVisitItem[]>(VISITS_STORE_KEY, DEFAULT_SITE_VISITS);
-    const filtered = visits.filter((v) => v.id !== visitId);
-    writeLocalJson(VISITS_STORE_KEY, filtered);
-
-    try {
-      const supabase = (await createClient()) as any;
-      await supabase.from('site_visits').delete().eq('id', visitId);
-    } catch (e: any) {
-      console.warn('Supabase delete error:', e.message);
-    }
+    const db = await getDatabase();
+    await db.collection('site_visits').deleteOne({ id: visitId });
 
     return { success: true };
   } catch (err: any) {

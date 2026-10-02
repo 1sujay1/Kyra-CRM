@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { readLocalJson, writeLocalJson } from '@/lib/storage';
+import { getDatabase } from '@/lib/mongodb';
 import { LeadDetailed } from '@/components/leads/lead-360-drawer';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
-
-const LEADS_FILE = 'leads.json';
 
 // GET: Meta Webhook verification handshake or health status
 export async function GET(req: NextRequest) {
@@ -55,7 +52,8 @@ export async function POST(req: NextRequest) {
         externalLeadId = change.leadgen_id;
         campaignName = change.campaign_name || 'Meta Farmland Campaign';
         projectName = change.project_name || 'Anaikatti Green Acres';
-        // If pre-fetched field data exists
+
+        // If pre-fetched field data exists in webhook payload
         if (change.field_data && Array.isArray(change.field_data)) {
           for (const field of change.field_data) {
             const name = field.name?.toLowerCase();
@@ -64,6 +62,31 @@ export async function POST(req: NextRequest) {
             if (name === 'phone_number' || name === 'phone') phone = val || phone;
             if (name === 'email') email = val || email;
             if (name === 'city') city = val || city;
+          }
+        }
+
+        // If only leadgen_id was sent and META_PAGE_ACCESS_TOKEN exists, query Meta Graph API
+        if (externalLeadId && process.env.META_PAGE_ACCESS_TOKEN && (fullName === 'Incoming Webhook Lead' || phone === '+919876543210')) {
+          try {
+            const graphVersion = process.env.META_GRAPH_API_VERSION || 'v21.0';
+            const graphRes = await fetch(
+              `https://graph.facebook.com/${graphVersion}/${externalLeadId}?access_token=${process.env.META_PAGE_ACCESS_TOKEN}`
+            );
+            if (graphRes.ok) {
+              const graphData = await graphRes.json();
+              if (graphData.field_data && Array.isArray(graphData.field_data)) {
+                for (const field of graphData.field_data) {
+                  const name = field.name?.toLowerCase();
+                  const val = field.values?.[0];
+                  if (name === 'full_name' || name === 'name') fullName = val || fullName;
+                  if (name === 'phone_number' || name === 'phone') phone = val || phone;
+                  if (name === 'email') email = val || email;
+                  if (name === 'city') city = val || city;
+                }
+              }
+            }
+          } catch (graphErr) {
+            console.warn('[Webhook] Meta Graph API fetch notice:', graphErr);
           }
         }
       }
@@ -107,27 +130,21 @@ export async function POST(req: NextRequest) {
       leadStatus = 'number_not_valid';
       statusComment = `Webhook received phone without 10 digits (${phoneCheck.digitCount} digits: ${phoneCheck.cleanDigits || 'empty'}). Status: Number Not Valid.`;
     } else {
-      // 2. Duplicate Check: If received multiple times with same 10-digit number
-      const localLeads = readLocalJson<LeadDetailed[]>(LEADS_FILE, []);
-      let isDuplicate = localLeads.some(
-        (l) => getCorePhoneDigits(l.phone) === phoneCheck.cleanDigits
-      );
+      // 2. Duplicate Check in MongoDB DB: If received multiple times with same 10-digit number
+      let isDuplicate = false;
+      try {
+        const db = await getDatabase();
+        const existingDb = await db
+          .collection('leads')
+          .find({ phone: { $regex: phoneCheck.cleanDigits } })
+          .limit(1)
+          .toArray();
 
-      if (!isDuplicate) {
-        try {
-          const supabase = (await createClient()) as any;
-          const { data: existingDb } = await supabase
-            .from('leads')
-            .select('id, phone')
-            .ilike('phone', `%${phoneCheck.cleanDigits}%`)
-            .limit(1);
-
-          if (existingDb && existingDb.length > 0) {
-            isDuplicate = true;
-          }
-        } catch {
-          // ignore
+        if (existingDb && existingDb.length > 0) {
+          isDuplicate = true;
         }
+      } catch {
+        // ignore
       }
 
       if (isDuplicate) {
@@ -179,20 +196,14 @@ export async function POST(req: NextRequest) {
       ],
     };
 
-    // 1. Immediately persist in local storage cache
-    const localLeads = readLocalJson<LeadDetailed[]>(LEADS_FILE, []);
-    localLeads.unshift(newLead);
-    writeLocalJson(LEADS_FILE, localLeads);
-
-    // 2. Persist to Supabase Database
+    // Persist to MongoDB Database
     let dbSuccess = false;
     try {
-      const supabase = (await createClient()) as any;
+      const db = await getDatabase();
 
-      // Insert into leads table
-      const { error: insertError } = await supabase.from('leads').insert({
+      // Insert into leads collection
+      await db.collection('leads').insertOne({
         id: newLead.id,
-        org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
         full_name: newLead.full_name,
         phone: newLead.phone,
         email: newLead.email,
@@ -208,54 +219,53 @@ export async function POST(req: NextRequest) {
         external_lead_id: externalLeadId,
         raw_payload: rawBody,
         created_at: newLead.created_at,
+        updated_at: new Date().toISOString(),
       });
 
-      if (!insertError) {
-        dbSuccess = true;
+      dbSuccess = true;
 
-        // Persist initial status log in Supabase
-        await supabase.from('lead_status_history').insert({
-          org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
-          lead_id: newLead.id,
-          to_status: newLead.status,
-          comment: statusComment,
-          changed_by: `Webhook Ingestion (${source.toUpperCase()})`,
-        });
+      // Persist initial status log in MongoDB
+      await db.collection('lead_status_history').insertOne({
+        id: `sh-${Date.now()}`,
+        lead_id: newLead.id,
+        to_status: newLead.status,
+        comment: statusComment,
+        changed_by: `Webhook Ingestion (${source.toUpperCase()})`,
+        created_at: new Date().toISOString(),
+      });
 
-        // Persist initial activity note in Supabase
-        await supabase.from('activities').insert({
-          org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
-          lead_id: newLead.id,
-          type: 'note',
-          outcome: newLead.status === 'number_not_valid' ? 'Invalid Phone Number' : newLead.status === 'duplicate_number' ? 'Duplicate Number Detected' : 'Lead Captured via Webhook',
-          notes: `${statusComment}. Campaign: ${campaignName}`,
-          created_by: `Webhook (${source.toUpperCase()})`,
-        });
-      } else {
-        console.warn('[Webhook] Notice saving to Supabase (saved in persistent store):', insertError.message);
-      }
+      // Persist initial activity note in MongoDB
+      await db.collection('activities').insertOne({
+        id: `act-${Date.now()}`,
+        lead_id: newLead.id,
+        type: 'note',
+        outcome: newLead.status === 'number_not_valid' ? 'Invalid Phone Number' : newLead.status === 'duplicate_number' ? 'Duplicate Number Detected' : 'Lead Captured via Webhook',
+        notes: `${statusComment}. Campaign: ${campaignName}`,
+        created_by: `Webhook (${source.toUpperCase()})`,
+        created_at: new Date().toISOString(),
+      });
 
       // Record in webhook_logs
       try {
-        await supabase.from('webhook_logs').insert({
-          org_id: process.env.DEFAULT_ORG_ID || '00000000-0000-0000-0000-000000000000',
+        await db.collection('webhook_logs').insertOne({
           source: source,
           payload: rawBody,
           lead_id: newLead.id,
           status: 'processed',
+          created_at: new Date().toISOString(),
         });
       } catch (logErr: any) {
         // non-blocking
       }
     } catch (e: any) {
-      console.warn('[Webhook] Supabase connection notice:', e.message);
+      console.warn('[Webhook] MongoDB connection notice:', e.message);
     }
 
     return NextResponse.json({
       success: true,
       message: 'Lead received and persisted successfully',
       lead_id: newLead.id,
-      stored_in_supabase: dbSuccess,
+      stored_in_mongodb: dbSuccess,
       lead: {
         id: newLead.id,
         full_name: newLead.full_name,

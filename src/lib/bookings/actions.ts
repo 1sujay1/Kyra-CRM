@@ -1,7 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { readLocalJson, writeLocalJson } from '@/lib/storage';
+import { getDatabase } from '@/lib/mongodb';
 import { fetchLeadsAction } from '@/lib/leads/actions';
 
 export interface BookingItem {
@@ -24,81 +23,46 @@ export interface BookingItem {
   created_at?: string;
 }
 
-const BOOKINGS_STORE_KEY = 'bookings.json';
-
-const INITIAL_CONFIRMED_BOOKINGS: BookingItem[] = [
-  {
-    id: 'bk-default-1',
-    customer_name: 'Vikram Chandrasekar',
-    customer_phone: '+91 98401 23456',
-    customer_email: 'vikram.chandrasekar@outlook.com',
-    project_name: 'Anaikatti Green Acres',
-    plot_no: 'Plot #A-14',
-    plot_size: '25 Cents',
-    agreed_price: 3125000,
-    booking_amount: 200000,
-    payment_mode: 'NEFT',
-    reference_no: 'NEFT-HDFC-9928174',
-    status: 'confirmed',
-    booking_date: '2026-09-26',
-    approved_by: 'Adminkyra',
-    notes: 'Advance token received via NEFT. Agreement drafting in progress.',
-    created_at: new Date('2026-09-26T10:00:00Z').toISOString(),
-  },
-];
-
 export async function fetchBookingsAction(): Promise<BookingItem[]> {
   try {
-    const localBookings = readLocalJson<BookingItem[]>(BOOKINGS_STORE_KEY, INITIAL_CONFIRMED_BOOKINGS);
-    const supabase = (await createClient()) as any;
-
+    const db = await getDatabase();
     let dbBookings: BookingItem[] = [];
 
-    // Try fetching from bookings table in Supabase
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .order('booking_date', { ascending: false });
+    // Query bookings collection from MongoDB database
+    const rawBookings = await db
+      .collection('bookings')
+      .find({})
+      .sort({ booking_date: -1 })
+      .toArray();
 
-      if (!error && data && data.length > 0) {
-        dbBookings = data.map((b: any) => ({
-          id: b.id,
-          lead_id: b.lead_id,
-          customer_name: b.customer_name || 'Valued Client',
-          customer_phone: b.customer_phone || '',
-          customer_email: b.customer_email || null,
-          project_name: b.project_name || 'Coimbatore Farmland Project',
-          plot_no: b.plot_no || (b.plot_id ? `Plot #${b.plot_id}` : 'Plot Assigned'),
-          plot_size: b.plot_size || '25 Cents',
-          agreed_price: Number(b.agreed_price) || 2500000,
-          booking_amount: Number(b.booking_amount) || 200000,
-          payment_mode: (b.payment_mode as any) || 'NEFT',
-          reference_no: b.reference_no,
-          status: b.status || 'confirmed',
-          booking_date: b.booking_date || new Date().toISOString().split('T')[0],
-          approved_by: b.approved_by,
-          notes: b.notes,
-          created_at: b.created_at,
-        }));
-      }
-    } catch {
-      // ignore
+    if (rawBookings && Array.isArray(rawBookings)) {
+      dbBookings = rawBookings.map((b: any) => ({
+        id: b.id || b._id.toString(),
+        lead_id: b.lead_id,
+        customer_name: b.customer_name || 'Valued Client',
+        customer_phone: b.customer_phone || '',
+        customer_email: b.customer_email || null,
+        project_name: b.project_name || 'Coimbatore Farmland Project',
+        plot_no: b.plot_no || (b.plot_id ? `Plot #${b.plot_id}` : 'Plot Assigned'),
+        plot_size: b.plot_size || '25 Cents',
+        agreed_price: Number(b.agreed_price) || 2500000,
+        booking_amount: Number(b.booking_amount) || 200000,
+        payment_mode: (b.payment_mode as any) || 'NEFT',
+        reference_no: b.reference_no,
+        status: b.status || 'confirmed',
+        booking_date: b.booking_date || new Date().toISOString().split('T')[0],
+        approved_by: b.approved_by,
+        notes: b.notes,
+        created_at: b.created_at,
+      }));
     }
 
-    // Merge DB + Local bookings
     const bookingsMap = new Map<string, BookingItem>();
-    for (const b of INITIAL_CONFIRMED_BOOKINGS) {
-      bookingsMap.set(b.id, b);
-    }
-    for (const b of localBookings) {
-      if (b?.id) bookingsMap.set(b.id, b);
-    }
     for (const b of dbBookings) {
       if (b?.id) bookingsMap.set(b.id, b);
     }
 
-    // Also pull any leads whose status is 'booked'
+    // Pull leads marked 'booked' dynamically from MongoDB
     try {
       const allLeads = await fetchLeadsAction();
       const bookedLeads = (allLeads || []).filter((l) => l.status === 'booked');
@@ -126,7 +90,7 @@ export async function fetchBookingsAction(): Promise<BookingItem[]> {
             reference_no: 'CRM-TOKEN-VERIFIED',
             status: 'confirmed',
             booking_date: lead.created_at ? lead.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-            approved_by: 'Adminkyra',
+            approved_by: 'Admin',
             notes: `Converted from Lead Pipeline (${lead.source ? lead.source.toUpperCase() : 'Meta'} enquiry).`,
             created_at: lead.created_at,
           });
@@ -140,10 +104,9 @@ export async function fetchBookingsAction(): Promise<BookingItem[]> {
       (a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime()
     );
 
-    writeLocalJson(BOOKINGS_STORE_KEY, merged);
     return merged;
   } catch (err: any) {
-    console.error('Error fetching bookings:', err);
-    return INITIAL_CONFIRMED_BOOKINGS;
+    console.error('Error fetching bookings from MongoDB:', err);
+    return [];
   }
 }

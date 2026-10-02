@@ -1,12 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { LogOut, User, Bell, Menu } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { createClient } from '@/lib/supabase/client';
-import { UserRole } from '@/types/database.types';
 import { logoutAction } from '@/lib/auth/actions';
+
+export type UserRole = 'admin' | 'digital_marketing' | 'manager' | 'sales_executive' | 'channel_partner';
 
 interface HeaderProps {
   userName?: string;
@@ -31,13 +30,9 @@ export function Header({
   orgName = 'Kyra Group (Coimbatore Farmlands)',
   onToggleMobileMenu,
 }: HeaderProps) {
-  const router = useRouter();
-
   const handleSignOut = async () => {
     try {
       await logoutAction();
-      const supabase = createClient();
-      await supabase.auth.signOut();
     } catch {
       // ignore
     }

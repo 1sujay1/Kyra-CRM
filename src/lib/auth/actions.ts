@@ -1,7 +1,8 @@
 'use server';
 
 import { cookies, headers } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+import { getDatabase } from '@/lib/mongodb';
+import bcrypt from 'bcryptjs';
 
 export interface LoginResult {
   success: boolean;
@@ -13,71 +14,8 @@ export interface LoginResult {
   };
 }
 
-// Allowed logins: STRICTLY Adminkyra and dmkyra with Kyra@1234#
-const VALID_USERS: Record<string, { email: string; username: string; role: 'admin' | 'digital_marketing' }> = {
-  // Adminkyra variations
-  adminkyra: {
-    username: 'Adminkyra',
-    email: 'adminkyra@kyragroup.com',
-    role: 'admin',
-  },
-  admin: {
-    username: 'Adminkyra',
-    email: 'adminkyra@kyragroup.com',
-    role: 'admin',
-  },
-  'adminkyra@kyragroup.com': {
-    username: 'Adminkyra',
-    email: 'adminkyra@kyragroup.com',
-    role: 'admin',
-  },
-  'admin@kyragroup.com': {
-    username: 'Adminkyra',
-    email: 'adminkyra@kyragroup.com',
-    role: 'admin',
-  },
-
-  // dmkyra variations
-  dmkyra: {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-  dm: {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-  'digital marketing': {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-  digitalmarketing: {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-  marketing: {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-  'dmkyra@kyragroup.com': {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-  'marketing@kyragroup.com': {
-    username: 'dmkyra',
-    email: 'dmkyra@kyragroup.com',
-    role: 'digital_marketing',
-  },
-};
-
 /**
- * Record user login/logout activity directly to the Supabase database.
- * Dual-layer write ensures persistence even before dedicated SQL migrations are executed.
+ * Record user login/logout activity directly in MongoDB `user_logins` collection.
  */
 async function recordLoginInDatabase(data: {
   username: string;
@@ -89,62 +27,35 @@ async function recordLoginInDatabase(data: {
   failureReason?: string;
 }) {
   try {
-    const supabase = await createClient();
-
-    // 1. Primary write: Attempt writing to dedicated user_logins table
-    const { error: userLoginsError } = await (supabase as any)
-      .from('user_logins')
-      .insert({
-        username: data.username,
-        email: data.email,
-        role: data.role,
-        status: data.status,
-        ip_address: data.ipAddress || '127.0.0.1',
-        user_agent: data.userAgent || 'Web Browser',
-        failure_reason: data.failureReason || null,
-        created_at: new Date().toISOString(),
-      });
-
-    // 2. Resilient fallback: If user_logins table is pending, write to webhook_logs
-    if (userLoginsError) {
-      await (supabase as any)
-        .from('webhook_logs')
-        .insert({
-          source: 'user_login',
-          status: data.status === 'success' ? 'processed' : 'error',
-          ip: data.ipAddress || null,
-          error_message: data.failureReason || null,
-          payload: {
-            event: data.status === 'success' ? 'user_login_success' : 'user_login_failed',
-            username: data.username,
-            email: data.email,
-            role: data.role,
-            status: data.status,
-            user_agent: data.userAgent || 'Web Browser',
-            timestamp: new Date().toISOString(),
-          },
-        });
-    }
-
-    // 3. Keep profile updated in profiles table
-    if (data.status === 'success') {
-      try {
-        await (supabase as any)
-          .from('profiles')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('username', data.username);
-      } catch {
-        // Non-blocking
-      }
-    }
+    const db = await getDatabase();
+    await db.collection('user_logins').insertOne({
+      username: data.username,
+      email: data.email,
+      role: data.role,
+      status: data.status,
+      ip_address: data.ipAddress || '127.0.0.1',
+      user_agent: data.userAgent || 'Web Browser',
+      failure_reason: data.failureReason || null,
+      created_at: new Date().toISOString(),
+    });
   } catch (err: any) {
-    console.warn('[AUTH_DB_LOG]: Could not persist login record to database:', err?.message);
+    console.warn('[AUTH_DB_LOG]: Could not persist login record to MongoDB:', err?.message);
   }
 }
 
+/**
+ * Dynamic MongoDB Database Authentication
+ */
 export async function loginAction(identifierRaw: string, passwordRaw: string): Promise<LoginResult> {
-  const identifier = identifierRaw.trim().toLowerCase();
+  const identifier = identifierRaw.trim();
   const password = passwordRaw.trim();
+
+  if (!identifier || !password) {
+    return {
+      success: false,
+      error: 'Username/Email and Password are required.',
+    };
+  }
 
   // Extract client IP and device user agent
   let clientIp = '127.0.0.1 (Coimbatore)';
@@ -156,105 +67,104 @@ export async function loginAction(identifierRaw: string, passwordRaw: string): P
     const ua = headerList.get('user-agent');
     if (ua) clientUserAgent = ua;
   } catch {
-    // headers optional in some test contexts
+    // headers optional
   }
 
-  // 1. Strict Login Whitelist Check: Only Adminkyra and dmkyra permitted
-  const validAccount = VALID_USERS[identifier];
-  if (!validAccount) {
-    await recordLoginInDatabase({
-      username: identifierRaw,
-      email: identifierRaw,
-      role: 'unauthorized',
-      status: 'failed',
-      failureReason: 'Account not authorized on CRM whitelist',
-      ipAddress: clientIp,
-      userAgent: clientUserAgent,
-    });
-
-    return {
-      success: false,
-      error: 'Access Denied: Only Adminkyra (Admin) and dmkyra (Digital Marketing) are authorized.',
-    };
+  let targetEmail = identifier.toLowerCase();
+  if (!targetEmail.includes('@')) {
+    targetEmail = `${targetEmail}@kyragroup.com`;
   }
 
-  // 2. Authenticate directly against Supabase database
-  let dbVerified = false;
   try {
-    const supabase = await createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: validAccount.email,
-      password: password,
+    const db = await getDatabase();
+    
+    // Query by username or email
+    const userDoc = await db.collection('users').findOne({
+      $or: [
+        { username: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+        { email: { $regex: new RegExp(`^${targetEmail}$`, 'i') } },
+        { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+      ],
     });
 
-    if (!authError || authError.code === 'email_not_confirmed') {
-      dbVerified = true;
-    } else if (authError.code === 'invalid_credentials') {
+    if (!userDoc) {
       await recordLoginInDatabase({
-        username: validAccount.username,
-        email: validAccount.email,
-        role: validAccount.role,
+        username: identifier,
+        email: targetEmail,
+        role: 'unauthorized',
         status: 'failed',
-        failureReason: 'Invalid password. Password did not match database record.',
+        failureReason: 'User not found',
         ipAddress: clientIp,
         userAgent: clientUserAgent,
       });
 
       return {
         success: false,
-        error: 'Invalid credentials. Password did not match database record.',
+        error: 'Invalid username/email or password.',
       };
     }
-  } catch (err: any) {
-    console.warn('Database authentication check error:', err?.message);
-  }
 
-  // Fallback verification if database network is unreachable
-  if (!dbVerified && password !== 'Kyra@1234#') {
+    // Verify password hash
+    const isPasswordValid = await bcrypt.compare(password, userDoc.passwordHash);
+
+    if (!isPasswordValid) {
+      await recordLoginInDatabase({
+        username: userDoc.username,
+        email: userDoc.email,
+        role: userDoc.role || 'unauthorized',
+        status: 'failed',
+        failureReason: 'Invalid password',
+        ipAddress: clientIp,
+        userAgent: clientUserAgent,
+      });
+
+      return {
+        success: false,
+        error: 'Invalid username/email or password.',
+      };
+    }
+
+    const userObj = {
+      username: userDoc.username,
+      email: userDoc.email,
+      role: (userDoc.role as 'admin' | 'digital_marketing') || 'admin',
+    };
+
+    // Record successful login in MongoDB
     await recordLoginInDatabase({
-      username: validAccount.username,
-      email: validAccount.email,
-      role: validAccount.role,
-      status: 'failed',
-      failureReason: 'Invalid credentials. Password is case-sensitive: Kyra@1234#',
+      username: userObj.username,
+      email: userObj.email,
+      role: userObj.role,
+      status: 'success',
       ipAddress: clientIp,
       userAgent: clientUserAgent,
     });
 
+    // Set secure cookie session
+    const cookieStore = await cookies();
+    const cookieOptions = {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+      maxAge: 60 * 60 * 24 * 7,
+    };
+
+    cookieStore.set('kyra_user_role', userObj.role, cookieOptions);
+    cookieStore.set('kyra_username', userObj.username, cookieOptions);
+    cookieStore.set('kyra_email', userObj.email, cookieOptions);
+
+    return {
+      success: true,
+      user: userObj,
+    };
+  } catch (err: any) {
+    console.error('MongoDB authentication exception:', err?.message);
     return {
       success: false,
-      error: 'Invalid credentials. Password is case-sensitive: Kyra@1234#',
+      error: `MongoDB authentication error: ${err?.message || 'Failed to connect to MongoDB.'}`,
     };
   }
-
-  // 3. Persist Successful Login Record to Database
-  await recordLoginInDatabase({
-    username: validAccount.username,
-    email: validAccount.email,
-    role: validAccount.role,
-    status: 'success',
-    ipAddress: clientIp,
-    userAgent: clientUserAgent,
-  });
-
-  // 4. Secure Cookie Session (7 days) with explicit path and sameSite
-  const cookieStore = await cookies();
-  const cookieOptions = {
-    path: '/',
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    maxAge: 60 * 60 * 24 * 7,
-  };
-
-  cookieStore.set('kyra_user_role', validAccount.role, cookieOptions);
-  cookieStore.set('kyra_username', validAccount.username, cookieOptions);
-  cookieStore.set('kyra_email', validAccount.email, cookieOptions);
-
-  return {
-    success: true,
-    user: validAccount,
-  };
 }
 
 export async function getCurrentUserAction() {
@@ -265,12 +175,7 @@ export async function getCurrentUserAction() {
     const email = cookieStore.get('kyra_email')?.value;
 
     if (!username || !role) {
-      // Default to Adminkyra for development/first render
-      return {
-        username: 'Adminkyra',
-        role: 'admin' as const,
-        email: 'adminkyra@kyragroup.com',
-      };
+      return null;
     }
 
     return {
@@ -279,19 +184,15 @@ export async function getCurrentUserAction() {
       email: email || `${username.toLowerCase()}@kyragroup.com`,
     };
   } catch {
-    return {
-      username: 'Adminkyra',
-      role: 'admin' as const,
-      email: 'adminkyra@kyragroup.com',
-    };
+    return null;
   }
 }
 
 export async function logoutAction() {
   const cookieStore = await cookies();
-  const username = cookieStore.get('kyra_username')?.value || 'Adminkyra';
+  const username = cookieStore.get('kyra_username')?.value || 'User';
   const role = cookieStore.get('kyra_user_role')?.value || 'admin';
-  const email = cookieStore.get('kyra_email')?.value || 'adminkyra@kyragroup.com';
+  const email = cookieStore.get('kyra_email')?.value || 'user@kyragroup.com';
 
   cookieStore.delete({ name: 'kyra_user_role', path: '/' });
   cookieStore.delete({ name: 'kyra_username', path: '/' });
@@ -317,9 +218,6 @@ export async function logoutAction() {
       ipAddress: clientIp,
       userAgent: clientUserAgent,
     });
-
-    const supabase = await createClient();
-    await supabase.auth.signOut();
   } catch {
     // ignore
   }
@@ -327,53 +225,25 @@ export async function logoutAction() {
 
 export async function fetchLoginAuditLogsAction() {
   try {
-    const supabase = await createClient();
+    const db = await getDatabase();
+    const logs = await db
+      .collection('user_logins')
+      .find({})
+      .sort({ created_at: -1 })
+      .limit(50)
+      .toArray();
 
-    // 1. Try from user_logins
-    const { data: userLogins, error: userLoginsError } = await (supabase as any)
-      .from('user_logins')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (!userLoginsError && userLogins && userLogins.length > 0) {
-      return userLogins.map((item: any) => ({
-        id: item.id,
-        user: `${item.username} (${item.role})`,
-        action: item.status === 'success' ? 'login_success' : 'login_failed',
-        entity: `Session: ${item.user_agent ? item.user_agent.slice(0, 30) : 'Browser Login'}`,
-        ip: item.ip_address || '127.0.0.1 (Coimbatore)',
-        time: formatRelativeTime(item.created_at),
-        createdAt: item.created_at,
-      }));
-    }
-
-    // 2. Fallback to webhook_logs where source = 'user_login'
-    const { data: webhookLogs } = await (supabase as any)
-      .from('webhook_logs')
-      .select('*')
-      .eq('source', 'user_login')
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (webhookLogs && webhookLogs.length > 0) {
-      return webhookLogs.map((item: any) => {
-        const payload = item.payload || {};
-        return {
-          id: item.id,
-          user: `${payload.username || 'User'} (${payload.role || 'Staff'})`,
-          action: item.status === 'processed' ? 'login_success' : 'login_failed',
-          entity: `Session: ${payload.event || 'user_login'}`,
-          ip: item.ip || '127.0.0.1 (Coimbatore)',
-          time: formatRelativeTime(item.created_at),
-          createdAt: item.created_at,
-        };
-      });
-    }
-
-    return [];
+    return logs.map((item: any) => ({
+      id: item._id.toString(),
+      user: `${item.username} (${item.role})`,
+      action: item.status === 'success' ? 'login_success' : 'login_failed',
+      entity: `Session: ${item.user_agent ? item.user_agent.slice(0, 30) : 'Browser Login'}`,
+      ip: item.ip_address || '127.0.0.1 (Coimbatore)',
+      time: formatRelativeTime(item.created_at),
+      createdAt: item.created_at,
+    }));
   } catch (err) {
-    console.warn('Could not fetch login audit logs from database:', err);
+    console.warn('Could not fetch login audit logs from MongoDB:', err);
     return [];
   }
 }
@@ -392,4 +262,3 @@ function formatRelativeTime(dateStr: string): string {
     return 'Recently';
   }
 }
-

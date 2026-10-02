@@ -53,7 +53,6 @@ import {
   deleteLeadAction,
 } from '@/lib/leads/actions';
 import { getCurrentUserAction } from '@/lib/auth/actions';
-import { createClient } from '@/lib/supabase/client';
 
 const statusBadgeStyles: Record<LeadStatusType, string> = {
   new: 'bg-sky-50 text-sky-700 border-sky-200/80 hover:bg-sky-100/80',
@@ -131,31 +130,15 @@ export default function LeadsPage() {
     }
   }, []);
 
-  // Initial load + Realtime Supabase Database Sync & Polling Fallback
+  // Initial load + Polling Heartbeat every 12 seconds
   useEffect(() => {
     loadData(true);
 
-    // Setup Supabase Realtime Listener on leads table
-    const supabase = createClient();
-    const channel = supabase
-      .channel('leads-realtime-crm')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'leads' },
-        (payload) => {
-          console.log('[Supabase Realtime] Leads table update detected:', payload.eventType);
-          loadData(false);
-        }
-      )
-      .subscribe();
-
-    // Secondary Polling Heartbeat every 12 seconds so webhook leads appear automatically
     const interval = setInterval(() => {
       loadData(false);
     }, 12000);
 
     return () => {
-      supabase.removeChannel(channel);
       clearInterval(interval);
     };
   }, [loadData]);

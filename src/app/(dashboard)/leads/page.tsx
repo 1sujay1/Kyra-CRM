@@ -480,7 +480,10 @@ export default function LeadsPage() {
         </div>
 
         {/* Card 2: Meta Campaigns */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+        <Link
+          href="/meta-leads"
+          className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 block cursor-pointer"
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-500" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -494,9 +497,12 @@ export default function LeadsPage() {
             <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">
               {leads.filter((l) => l.source === 'meta').length}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Anaikatti & Siruvani Ad Sets</p>
+            <p className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+              <span>Anaikatti & Siruvani Ad Sets</span>
+              <span className="text-sky-600 font-semibold group-hover:underline">View All →</span>
+            </p>
           </div>
-        </div>
+        </Link>
 
         {/* Card 3: Google Ads / Webhooks */}
         <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">

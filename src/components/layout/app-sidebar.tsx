@@ -9,9 +9,11 @@ import {
   Trees,
   X,
   MapPin,
+  Megaphone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { UserRole } from '@/types/database.types';
+
+export type UserRole = 'admin' | 'digital_marketing' | 'manager' | 'sales_executive' | 'channel_partner';
 
 interface SidebarProps {
   userRole?: UserRole;
@@ -26,12 +28,18 @@ export function AppSidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
-  // Core operational menu: Leads, Farmland Projects, Site Visits, Bookings
+  // Core operational menu: Leads, Meta Campaigns, Farmland Projects, Site Visits, Bookings
   const navItems = [
     {
       title: 'Leads Pipeline',
       href: '/leads',
       icon: Users,
+      roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
+    },
+    {
+      title: 'Meta Campaigns',
+      href: '/meta-leads',
+      icon: Megaphone,
       roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
     },
     {

@@ -24,7 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files - NEVER commit sensitive credentials
-.env*
+# .env*
 !.env.example
 
 # vercel

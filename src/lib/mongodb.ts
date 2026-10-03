@@ -10,10 +10,41 @@ try {
 
 const rawUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/kyra_crm';
 
+/**
+ * Automatically create empty collections in MongoDB if they do not exist yet.
+ * Does NOT insert any user credentials or dummy documents.
+ */
+async function ensureCollectionsExist(db: Db) {
+  try {
+    const existingCollections = await db.listCollections().toArray();
+    const existingNames = new Set(existingCollections.map((c) => c.name));
+    const requiredCollections = [
+      'users',
+      'leads',
+      'bookings',
+      'projects',
+      'plots',
+      'site_visits',
+      'webhook_logs',
+      'user_logins',
+      'audit_logs',
+    ];
+
+    for (const name of requiredCollections) {
+      if (!existingNames.has(name)) {
+        await db.createCollection(name);
+      }
+    }
+  } catch {
+    // Non-blocking
+  }
+}
+
 async function connectToMongo(uri: string): Promise<MongoClient> {
   try {
     const client = new MongoClient(uri);
     await client.connect();
+    await ensureCollectionsExist(client.db());
     console.log('✅ DB connected successfully');
     return client;
   } catch (err: any) {
@@ -34,6 +65,7 @@ async function connectToMongo(uri: string): Promise<MongoClient> {
           const directUri = `mongodb://${user}:${pass}@${seedList}/${dbAndQuery}?ssl=true&authSource=admin`;
           const directClient = new MongoClient(directUri);
           await directClient.connect();
+          await ensureCollectionsExist(directClient.db());
           console.log('✅ DB connected successfully');
           return directClient;
         }

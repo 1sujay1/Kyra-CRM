@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Search,
   Download,
-  Plus,
   Eye,
   EyeOff,
   Edit,
@@ -17,6 +16,10 @@ import {
   Layers,
   ExternalLink,
   ArrowLeft,
+  Maximize2,
+  Copy,
+  Check,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +33,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { maskPhone } from '@/lib/security/phone';
 import { StatusChangeModal, LeadStatusType } from '@/components/leads/status-change-modal';
 import { Lead360Drawer, LeadDetailed, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
@@ -71,44 +81,70 @@ const statusLabels: Record<LeadStatusType, string> = {
   junk: 'Junk / Spam',
 };
 
-// Target Meta Campaigns
-const META_CAMPAIGNS = [
-  {
-    id: 'all',
-    name: 'All Meta Campaigns',
-    subtitle: 'Combined Facebook & Instagram Lead Ads',
-    color: 'from-sky-500 to-blue-600',
-    badge: 'All Ad Sets',
-  },
-  {
-    id: 'anaikatti',
-    name: 'Anaikatti Green Acres',
-    subtitle: 'Meta Farmland Lead Ads (Ad Set #1)',
-    color: 'from-emerald-500 to-teal-600',
-    badge: 'Active Campaign',
-  },
-  {
-    id: 'pollachi',
-    name: 'Pollachi Coconut Groves',
-    subtitle: 'Agricultural Estate Ads (Ad Set #2)',
-    color: 'from-amber-500 to-orange-600',
-    badge: 'Active Campaign',
-  },
-  {
-    id: 'siruvani',
-    name: 'Siruvani River Foothills',
-    subtitle: 'Waterfront Estate Ads (Ad Set #3)',
-    color: 'from-purple-500 to-indigo-600',
-    badge: 'Active Campaign',
-  },
-  {
-    id: 'coimbatore',
-    name: 'Coimbatore Suburban Plots',
-    subtitle: 'Investment Plot Ads (Ad Set #4)',
-    color: 'from-pink-500 to-rose-600',
-    badge: 'Active Campaign',
-  },
+// Active Meta Campaigns for Kyra Group
+const ACTIVE_KYRA_CAMPAIGNS = [
+  { name: 'Leads Campaign Pollachi', subtitle: 'Pollachi Region Lead Ads', color: 'from-amber-500 to-orange-600' },
+  { name: 'Leads Campaign Tiruppur', subtitle: 'Tiruppur Region Lead Ads', color: 'from-purple-500 to-indigo-600' },
+  { name: 'Leads Campaign CBE-2', subtitle: 'Coimbatore Phase 2 Lead Ads', color: 'from-emerald-500 to-teal-600' },
+  { name: 'Leads Campaign Coimbatore', subtitle: 'Coimbatore Metro Lead Ads', color: 'from-pink-500 to-rose-600' },
 ];
+
+/**
+ * Reusable Tooltip + Text Truncation Component
+ * Shows custom hover tooltip when text is hovered, with option to open enlarge modal
+ */
+function TruncatedTextWithTooltip({
+  text,
+  maxLength = 24,
+  className = '',
+  onEnlarge,
+  showEnlargeIcon = true,
+}: {
+  text: string;
+  maxLength?: number;
+  className?: string;
+  onEnlarge?: (text: string) => void;
+  showEnlargeIcon?: boolean;
+}) {
+  const isLong = text && text.length > maxLength;
+  const displayText = isLong ? `${text.slice(0, maxLength)}...` : text;
+
+  return (
+    <div className="group/tooltip relative inline-flex items-center gap-1.5 max-w-full">
+      <span
+        title={text}
+        className={`truncate ${className}`}
+      >
+        {displayText}
+      </span>
+
+      {/* Floating Hover Tooltip */}
+      {isLong && (
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 opacity-0 transition-all duration-200 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 translate-y-1">
+          <div className="relative max-w-xs sm:max-w-sm rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-slate-100 shadow-xl border border-slate-800 break-words text-center">
+            {text}
+            <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-900" />
+          </div>
+        </div>
+      )}
+
+      {/* Optional Enlarge Icon Button */}
+      {showEnlargeIcon && onEnlarge && isLong && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEnlarge(text);
+          }}
+          className="opacity-0 group-hover/tooltip:opacity-100 p-0.5 rounded text-sky-600 hover:bg-sky-100 transition-all shrink-0"
+          title="Enlarge text in modal"
+        >
+          <Maximize2 className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function MetaLeadsPage() {
   const [leads, setLeads] = useState<LeadDetailed[]>([]);
@@ -118,6 +154,16 @@ export default function MetaLeadsPage() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
   const [revealedPhones, setRevealedPhones] = useState<Record<string, boolean>>({});
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
+
+  // Enlarge Text / Campaign Modal State
+  const [enlargeModalOpen, setEnlargeModalOpen] = useState(false);
+  const [enlargedData, setEnlargedData] = useState<{
+    title: string;
+    subtitle?: string;
+    type: 'campaign' | 'text';
+    details?: Record<string, string | number>;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Modals & Drawers State
   const [selectedLeadFor360, setSelectedLeadFor360] = useState<LeadDetailed | null>(null);
@@ -143,7 +189,7 @@ export default function MetaLeadsPage() {
     loadUser();
   }, []);
 
-  // Fetch all Meta leads
+  // Fetch all Meta leads from MongoDB
   const loadData = useCallback(async (showLoadingSpinner = true) => {
     if (showLoadingSpinner) setLoading(true);
     setIsRefreshing(true);
@@ -169,38 +215,132 @@ export default function MetaLeadsPage() {
   }, [loadData]);
 
   // Filter only Meta leads
-  const allMetaLeads = leads.filter((l) => l.source === 'meta' || l.campaign_name?.toLowerCase().includes('meta') || l.campaign_name?.toLowerCase().includes('facebook') || l.campaign_name?.toLowerCase().includes('instagram'));
+  const allMetaLeads = useMemo(() => {
+    return leads.filter(
+      (l) =>
+        l.source === 'meta' ||
+        l.campaign_name?.toLowerCase().includes('meta') ||
+        l.campaign_name?.toLowerCase().includes('facebook') ||
+        l.campaign_name?.toLowerCase().includes('instagram') ||
+        l.campaign_name?.toLowerCase().includes('lead')
+    );
+  }, [leads]);
+
+  /**
+   * Dynamically Extract Campaign Names for Kyra Group Active Campaigns & Live Webhooks
+   */
+  const dynamicCampaigns = useMemo(() => {
+    const metaLeads = allMetaLeads;
+
+    // Extract unique campaign names from API leads in DB
+    const apiCampaignNames = Array.from(
+      new Set(metaLeads.map((l) => (l.campaign_name || '').trim()).filter(Boolean))
+    );
+
+    const campaignMap = new Map<
+      string,
+      { id: string; name: string; subtitle: string; color: string; badge: string; count: number }
+    >();
+
+    const colors = [
+      'from-amber-500 to-orange-600',
+      'from-purple-500 to-indigo-600',
+      'from-emerald-500 to-teal-600',
+      'from-pink-500 to-rose-600',
+      'from-blue-500 to-cyan-600',
+      'from-violet-500 to-purple-600',
+    ];
+
+    // 1. Add active Kyra Group campaigns
+    ACTIVE_KYRA_CAMPAIGNS.forEach((base) => {
+      const key = base.name.toLowerCase();
+      const idKey = key.replace(/[^a-z0-9]/g, '_');
+      const searchKey = base.name.toLowerCase().replace('leads campaign ', '');
+
+      const count = metaLeads.filter(
+        (l) =>
+          (l.campaign_name || '').toLowerCase().includes(searchKey) ||
+          (l.project_name || '').toLowerCase().includes(searchKey) ||
+          (l.campaign_name || '').toLowerCase().includes(key)
+      ).length;
+
+      campaignMap.set(key, {
+        id: idKey,
+        name: base.name,
+        subtitle: base.subtitle,
+        color: base.color,
+        badge: 'Active Campaign',
+        count,
+      });
+    });
+
+    // 2. Add any additional unique campaign names ingested via API webhooks
+    apiCampaignNames.forEach((name, idx) => {
+      const lower = name.toLowerCase();
+      const existingKey = Array.from(campaignMap.keys()).find(
+        (k) => k === lower || lower.includes(k) || k.includes(lower)
+      );
+
+      if (!existingKey) {
+        const idKey = lower.replace(/[^a-z0-9]/g, '_');
+        const count = metaLeads.filter(
+          (l) => (l.campaign_name || '').trim().toLowerCase() === lower
+        ).length;
+
+        campaignMap.set(lower, {
+          id: idKey,
+          name: name,
+          subtitle: `Meta API Live Campaign`,
+          color: colors[idx % colors.length],
+          badge: 'Live Meta API',
+          count,
+        });
+      }
+    });
+
+    const campaignList = Array.from(campaignMap.values());
+
+    return [
+      {
+        id: 'all',
+        name: 'All Meta Campaigns',
+        subtitle: 'Combined Meta API Lead Ads & Forms',
+        color: 'from-sky-500 to-blue-600',
+        badge: 'All Ad Sets',
+        count: metaLeads.length,
+      },
+      ...campaignList,
+    ];
+  }, [allMetaLeads]);
 
   // Interactive filtering by active campaign card
-  const filteredMetaLeads = allMetaLeads.filter((lead) => {
-    const matchesSearch =
-      lead.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone.includes(searchTerm) ||
-      (lead.campaign_name && lead.campaign_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (lead.project_name && lead.project_name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredMetaLeads = useMemo(() => {
+    return allMetaLeads.filter((lead) => {
+      const matchesSearch =
+        lead.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.phone.includes(searchTerm) ||
+        (lead.campaign_name && lead.campaign_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (lead.project_name && lead.project_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    if (!matchesSearch) return false;
+      if (!matchesSearch) return false;
 
-    if (selectedCampaign === 'all') return true;
+      if (selectedCampaign === 'all') return true;
 
-    const campaignLower = (lead.campaign_name || '').toLowerCase();
-    const projectLower = (lead.project_name || '').toLowerCase();
+      const targetCamp = dynamicCampaigns.find((c) => c.id === selectedCampaign);
+      if (!targetCamp) return true;
 
-    if (selectedCampaign === 'anaikatti') {
-      return campaignLower.includes('anaikatti') || projectLower.includes('anaikatti');
-    }
-    if (selectedCampaign === 'pollachi') {
-      return campaignLower.includes('pollachi') || projectLower.includes('pollachi');
-    }
-    if (selectedCampaign === 'siruvani') {
-      return campaignLower.includes('siruvani') || projectLower.includes('siruvani');
-    }
-    if (selectedCampaign === 'coimbatore') {
-      return campaignLower.includes('coimbatore') || projectLower.includes('coimbatore') || campaignLower.includes('plot');
-    }
+      const campNameLower = targetCamp.name.toLowerCase();
+      const leadCampLower = (lead.campaign_name || '').toLowerCase();
+      const leadProjLower = (lead.project_name || '').toLowerCase();
+      const coreKeyword = campNameLower.replace('leads campaign ', '');
 
-    return true;
-  });
+      return (
+        leadCampLower.includes(campNameLower) ||
+        leadCampLower.includes(coreKeyword) ||
+        leadProjLower.includes(coreKeyword)
+      );
+    });
+  }, [allMetaLeads, searchTerm, selectedCampaign, dynamicCampaigns]);
 
   const handleToggleRevealPhone = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -211,7 +351,10 @@ export default function MetaLeadsPage() {
     e.stopPropagation();
     const cleanDigits = phone.replace(/\D/g, '');
     const waNumber = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
-    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent('Hello from Kyra Group Farmlands. Regarding your Meta enquiry:')}`, '_blank');
+    window.open(
+      `https://wa.me/${waNumber}?text=${encodeURIComponent('Hello from Kyra Group Farmlands. Regarding your Meta enquiry:')}`,
+      '_blank'
+    );
   };
 
   const handleOpenStatusModal = (e: React.MouseEvent, lead: LeadDetailed) => {
@@ -235,8 +378,25 @@ export default function MetaLeadsPage() {
     setDrawerOpen(true);
   };
 
+  // Open Enlarged Modal for long text or campaign details
+  const handleOpenEnlargeModal = (
+    title: string,
+    subtitle?: string,
+    details?: Record<string, string | number>,
+    type: 'campaign' | 'text' = 'campaign'
+  ) => {
+    setEnlargedData({ title, subtitle, details, type });
+    setEnlargeModalOpen(true);
+    setCopied(false);
+  };
+
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleStatusChanged = async (leadId: string, newStatus: LeadStatusType, comment: string) => {
-    let targetUpdatedLead: LeadDetailed | null = null;
     setLeads((prev) =>
       prev.map((lead) => {
         if (lead.id === leadId) {
@@ -253,7 +413,6 @@ export default function MetaLeadsPage() {
             status: newStatus,
             status_history: [newHistoryItem, ...lead.status_history],
           };
-          targetUpdatedLead = updated;
           if (selectedLeadFor360?.id === leadId) {
             setSelectedLeadFor360(updated);
           }
@@ -284,7 +443,19 @@ export default function MetaLeadsPage() {
       alert('No Meta leads available to export.');
       return;
     }
-    const headers = ['Lead ID', 'Full Name', 'Phone', 'Email', 'City', 'Campaign Name', 'Project Name', 'Budget Range', 'Status', 'Quality', 'Created At'];
+    const headers = [
+      'Lead ID',
+      'Full Name',
+      'Phone',
+      'Email',
+      'City',
+      'Campaign Name',
+      'Project Name',
+      'Budget Range',
+      'Status',
+      'Quality',
+      'Created At',
+    ];
     const csvRows = [headers.join(',')];
     filteredMetaLeads.forEach((l) => {
       const row = [
@@ -333,15 +504,15 @@ export default function MetaLeadsPage() {
               <span>Meta Ads & Campaigns Dashboard</span>
             </h2>
             <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-300 font-mono text-[10px]">
-              Business ID: 4372848433003520
+              Meta API Active
             </Badge>
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live Webhook Sync: {lastSyncedTime}</span>
+              <span>Live Meta API Sync: {lastSyncedTime}</span>
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Live ingestion & active campaign analytics for Facebook Lead Ads and Instagram Lead Forms.
+            Live campaign analytics & lead ingestion for Facebook & Instagram Lead Ads.
           </p>
         </div>
 
@@ -361,29 +532,18 @@ export default function MetaLeadsPage() {
             <Download className="h-3.5 w-3.5" />
             <span>Export Meta CSV</span>
           </Button>
-
-          <a
-            href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?global_scope_id=4372848433003520&business_id=4372848433003520&act=1073548992341142"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Button size="sm" className="gap-2 text-xs bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-md shadow-sky-600/20 cursor-pointer">
-              <ExternalLink className="h-4 w-4" />
-              <span>Open Meta Ads Manager</span>
-            </Button>
-          </a>
         </div>
       </div>
 
-      {/* WEBHOOK URL BANNER */}
+      {/* INTEGRATION STATUS BANNER */}
       <div className="p-3.5 bg-slate-900 text-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border border-slate-800 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
             <Megaphone className="h-4 w-4" />
           </div>
           <div>
-            <p className="font-semibold text-white">Live Webhook Endpoint URL</p>
-            <p className="font-mono text-[11px] text-sky-300 mt-0.5">https://crm.kyragroupindia.com/api/webhooks/leads</p>
+            <p className="font-semibold text-white">Live Meta Lead Ads Integration</p>
+            <p className="font-medium text-[11px] text-sky-300 mt-0.5">Automated real-time lead synchronization for Facebook & Instagram Lead Forms</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -393,68 +553,88 @@ export default function MetaLeadsPage() {
         </div>
       </div>
 
-      {/* ACTIVE CAMPAIGNS SUMMARY CARDS (INTERACTIVE FILTERING) */}
+      {/* DYNAMIC API CAMPAIGNS SUMMARY CARDS */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
             <Layers className="h-4 w-4 text-sky-600" />
-            <span>Active Meta Campaigns ({META_CAMPAIGNS.length - 1} Running)</span>
+            <span>Active Meta Campaigns ({dynamicCampaigns.length - 1} Running via API)</span>
           </h3>
-          <span className="text-xs text-slate-500">Click any campaign card to filter leads</span>
+          <span className="text-xs text-slate-500">Hover for full text tooltip • Click card or 🔍 to enlarge</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {META_CAMPAIGNS.map((camp) => {
+          {dynamicCampaigns.map((camp) => {
             const isSelected = selectedCampaign === camp.id;
-            let count = 0;
-
-            if (camp.id === 'all') {
-              count = allMetaLeads.length;
-            } else if (camp.id === 'anaikatti') {
-              count = allMetaLeads.filter((l) => (l.campaign_name || '').toLowerCase().includes('anaikatti') || l.project_name.toLowerCase().includes('anaikatti')).length;
-            } else if (camp.id === 'pollachi') {
-              count = allMetaLeads.filter((l) => (l.campaign_name || '').toLowerCase().includes('pollachi') || l.project_name.toLowerCase().includes('pollachi')).length;
-            } else if (camp.id === 'siruvani') {
-              count = allMetaLeads.filter((l) => (l.campaign_name || '').toLowerCase().includes('siruvani') || l.project_name.toLowerCase().includes('siruvani')).length;
-            } else if (camp.id === 'coimbatore') {
-              count = allMetaLeads.filter((l) => (l.campaign_name || '').toLowerCase().includes('coimbatore') || l.project_name.toLowerCase().includes('coimbatore')).length;
-            }
 
             return (
-              <button
+              <div
                 key={camp.id}
-                type="button"
                 onClick={() => setSelectedCampaign(camp.id)}
-                className={`relative text-left rounded-2xl bg-white p-4 border transition-all duration-200 cursor-pointer overflow-hidden ${
+                className={`group/card relative text-left rounded-2xl bg-white p-4 border transition-all duration-200 cursor-pointer overflow-hidden flex flex-col justify-between ${
                   isSelected
                     ? 'border-sky-500 ring-2 ring-sky-500/20 shadow-md bg-sky-50/20'
                     : 'border-slate-200/80 hover:border-slate-300 hover:shadow-md'
                 }`}
               >
                 <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${camp.color}`} />
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">
-                    {camp.badge}
-                  </span>
-                  {isSelected && (
-                    <span className="h-2 w-2 rounded-full bg-sky-600 animate-ping" />
-                  )}
-                </div>
+                
+                <div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold truncate max-w-[120px]" title={camp.badge}>
+                      {camp.badge}
+                    </span>
 
-                <div className="mt-3">
-                  <h4 className="font-bold text-slate-900 text-sm tracking-tight leading-snug line-clamp-1">
-                    {camp.name}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{camp.subtitle}</p>
+                    <div className="flex items-center gap-1">
+                      {/* Enlarge Campaign Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEnlargeModal(camp.name, camp.subtitle, {
+                            'Total Lead Count': camp.count,
+                            'Campaign ID': camp.id,
+                            'Badge Tag': camp.badge,
+                            'Source': 'Meta Ads Manager API',
+                          });
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                        title="Enlarge campaign modal"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                      </button>
+
+                      {isSelected && (
+                        <span className="h-2 w-2 rounded-full bg-sky-600 animate-ping" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    {/* Campaign Name with Tooltip & Truncation */}
+                    <div className="font-bold text-slate-900 text-sm tracking-tight leading-snug">
+                      <TruncatedTextWithTooltip
+                        text={camp.name}
+                        maxLength={22}
+                        className="font-bold text-slate-900 text-sm"
+                        onEnlarge={(t) => handleOpenEnlargeModal(t, camp.subtitle, { Leads: camp.count })}
+                      />
+                    </div>
+
+                    {/* Subtitle with Tooltip */}
+                    <p className="text-[11px] text-slate-500 mt-0.5 truncate" title={camp.subtitle}>
+                      {camp.subtitle}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-3 flex items-baseline justify-between pt-2 border-t border-slate-100">
-                  <div className="text-xl font-extrabold font-mono text-slate-900">{count}</div>
+                  <div className="text-xl font-extrabold font-mono text-slate-900">{camp.count}</div>
                   <span className="text-[11px] font-semibold text-sky-600">
                     {isSelected ? 'Filtered' : 'Filter →'}
                   </span>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -499,7 +679,7 @@ export default function MetaLeadsPage() {
             <Megaphone className="h-4 w-4 text-sky-600" />
             <span>Inbound Meta Lead Ads Records</span>
           </h3>
-          <span className="text-xs text-slate-500 font-mono">Source: Meta Lead Webhook</span>
+          <span className="text-xs text-slate-500 font-mono">Source: Live Meta API Webhook</span>
         </div>
 
         {loading ? (
@@ -543,6 +723,7 @@ export default function MetaLeadsPage() {
                 {filteredMetaLeads.map((lead) => {
                   const isRevealed = Boolean(revealedPhones[lead.id]);
                   const displayPhone = isRevealed ? lead.phone : maskPhone(lead.phone);
+                  const campaignNameText = lead.campaign_name || 'Meta Farmland Ad';
 
                   return (
                     <TableRow
@@ -550,15 +731,29 @@ export default function MetaLeadsPage() {
                       onClick={() => handleOpen360Drawer(lead)}
                       className="hover:bg-sky-50/40 cursor-pointer transition-colors"
                     >
-                      {/* Name & Email */}
-                      <TableCell className="font-semibold text-slate-900 py-3.5">
+                      {/* Name & Email with Tooltip & Enlarge */}
+                      <TableCell className="font-semibold text-slate-900 py-3.5 max-w-[200px]">
                         <div className="flex items-center gap-2.5">
                           <div className="h-8 w-8 rounded-full bg-sky-100 text-sky-800 font-bold flex items-center justify-center text-xs shrink-0 border border-sky-200">
                             {lead.full_name.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="font-bold text-slate-900 text-xs leading-tight">{lead.full_name}</p>
-                            <p className="text-[11px] text-slate-500">{lead.email || `${lead.full_name.toLowerCase().replace(/\s+/g, '')}@meta.com`}</p>
+                          <div className="overflow-hidden">
+                            <TruncatedTextWithTooltip
+                              text={lead.full_name}
+                              maxLength={20}
+                              className="font-bold text-slate-900 text-xs leading-tight"
+                              onEnlarge={(t) =>
+                                handleOpenEnlargeModal(t, lead.email || 'Meta Lead', {
+                                  Phone: lead.phone,
+                                  City: lead.city || 'Coimbatore',
+                                  Project: lead.project_name,
+                                  Status: lead.status,
+                                }, 'text')
+                              }
+                            />
+                            <p className="text-[11px] text-slate-500 truncate" title={lead.email || `${lead.full_name.toLowerCase().replace(/\s+/g, '')}@meta.com`}>
+                              {lead.email || `${lead.full_name.toLowerCase().replace(/\s+/g, '')}@meta.com`}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
@@ -586,18 +781,43 @@ export default function MetaLeadsPage() {
                         </div>
                       </TableCell>
 
-                      {/* Campaign Name */}
-                      <TableCell className="py-3.5">
+                      {/* Campaign Name Badge with Tooltip & Enlarge Modal */}
+                      <TableCell className="py-3.5 max-w-[220px]">
                         <div className="flex items-center gap-1.5">
-                          <Badge variant="outline" className="bg-sky-50 text-sky-800 border-sky-200 text-[10px] font-semibold">
-                            {lead.campaign_name || 'Meta Farmland Ad'}
+                          <Badge
+                            variant="outline"
+                            className="bg-sky-50 text-sky-800 border-sky-200 text-[10px] font-semibold max-w-full inline-flex items-center gap-1 py-1"
+                          >
+                            <TruncatedTextWithTooltip
+                              text={campaignNameText}
+                              maxLength={22}
+                              className="font-semibold text-sky-800"
+                              onEnlarge={(t) =>
+                                handleOpenEnlargeModal(
+                                  t,
+                                  `Meta Ad Campaign Record for ${lead.full_name}`,
+                                  {
+                                    'Customer Name': lead.full_name,
+                                    'Target Project': lead.project_name,
+                                    'Source Platform': lead.source.toUpperCase(),
+                                    'Lead Status': lead.status,
+                                    'Date Received': lead.created_at,
+                                  }
+                                )
+                              }
+                            />
                           </Badge>
                         </div>
                       </TableCell>
 
-                      {/* Project Name */}
-                      <TableCell className="py-3.5 font-medium text-slate-700">
-                        {lead.project_name}
+                      {/* Project Name with Tooltip */}
+                      <TableCell className="py-3.5 font-medium text-slate-700 max-w-[180px]">
+                        <TruncatedTextWithTooltip
+                          text={lead.project_name}
+                          maxLength={20}
+                          className="font-medium text-slate-700"
+                          onEnlarge={(t) => handleOpenEnlargeModal(t, 'Project Name Detail', {}, 'text')}
+                        />
                       </TableCell>
 
                       {/* Quality Badge */}
@@ -665,6 +885,65 @@ export default function MetaLeadsPage() {
           </div>
         )}
       </Card>
+
+      {/* ENLARGE CAMPAIGN & TEXT MODAL */}
+      {enlargedData && (
+        <Dialog open={enlargeModalOpen} onOpenChange={setEnlargeModalOpen}>
+          <DialogContent className="max-w-md bg-white border-slate-200 p-6 rounded-2xl shadow-2xl">
+            <DialogHeader className="text-left space-y-2 border-b pb-4">
+              <div className="flex items-center justify-between">
+                <Badge variant="outline" className="bg-sky-50 text-sky-800 border-sky-300 font-mono text-[10px]">
+                  {enlargedData.type === 'campaign' ? 'Meta Campaign Details' : 'Enlarged Text Detail'}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopyText(enlargedData.title)}
+                  className="h-7 px-2.5 text-xs text-slate-600 hover:bg-slate-100 gap-1.5"
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </Button>
+              </div>
+
+              <DialogTitle className="text-xl font-black tracking-tight text-slate-900 leading-snug break-words">
+                {enlargedData.title}
+              </DialogTitle>
+
+              {enlargedData.subtitle && (
+                <DialogDescription className="text-xs text-slate-500 leading-relaxed font-medium">
+                  {enlargedData.subtitle}
+                </DialogDescription>
+              )}
+            </DialogHeader>
+
+            {enlargedData.details && Object.keys(enlargedData.details).length > 0 && (
+              <div className="py-4 space-y-2.5">
+                <p className="text-[11px] uppercase font-bold tracking-wider text-slate-400">Associated Metadata</p>
+                <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3.5 space-y-2">
+                  {Object.entries(enlargedData.details).map(([key, val]) => (
+                    <div key={key} className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-500 font-medium">{key}:</span>
+                      <span className="text-slate-900 font-bold text-right">{String(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEnlargeModalOpen(false)}
+                className="text-xs"
+              >
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* 360 DEGREE DRAWER */}
       {selectedLeadFor360 && (

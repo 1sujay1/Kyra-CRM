@@ -90,21 +90,23 @@ const ACTIVE_KYRA_CAMPAIGNS = [
 ];
 
 /**
- * Reusable Tooltip + Text Truncation Component
- * Shows custom hover tooltip when text is hovered, with option to open enlarge modal
+ * Reusable Tooltip + Text Component
+ * Displays text clearly in up to 2 lines without early truncating, showing hover tooltip for long strings
  */
 function TruncatedTextWithTooltip({
   text,
-  maxLength = 24,
+  maxLength = 60,
   className = '',
   onEnlarge,
   showEnlargeIcon = true,
+  multiline = true,
 }: {
   text: string;
   maxLength?: number;
   className?: string;
   onEnlarge?: (text: string) => void;
   showEnlargeIcon?: boolean;
+  multiline?: boolean;
 }) {
   const isLong = text && text.length > maxLength;
   const displayText = isLong ? `${text.slice(0, maxLength)}...` : text;
@@ -113,7 +115,7 @@ function TruncatedTextWithTooltip({
     <div className="group/tooltip relative inline-flex items-center gap-1.5 max-w-full">
       <span
         title={text}
-        className={`truncate ${className}`}
+        className={`${multiline ? 'line-clamp-2 break-words whitespace-normal leading-snug' : 'truncate'} ${className}`}
       >
         {displayText}
       </span>
@@ -610,19 +612,17 @@ export default function MetaLeadsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3">
-                    {/* Campaign Name with Tooltip & Truncation */}
-                    <div className="font-bold text-slate-900 text-sm tracking-tight leading-snug">
-                      <TruncatedTextWithTooltip
-                        text={camp.name}
-                        maxLength={22}
-                        className="font-bold text-slate-900 text-sm"
-                        onEnlarge={(t) => handleOpenEnlargeModal(t, camp.subtitle, { Leads: camp.count })}
-                      />
-                    </div>
+                  <div className="mt-2.5">
+                    {/* Campaign Name clearly displayed in 2 lines */}
+                    <h4
+                      className="font-bold text-slate-900 text-xs sm:text-sm leading-snug line-clamp-2 break-words min-h-[2.5rem]"
+                      title={camp.name}
+                    >
+                      {camp.name}
+                    </h4>
 
                     {/* Subtitle with Tooltip */}
-                    <p className="text-[11px] text-slate-500 mt-0.5 truncate" title={camp.subtitle}>
+                    <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1" title={camp.subtitle}>
                       {camp.subtitle}
                     </p>
                   </div>
@@ -781,31 +781,16 @@ export default function MetaLeadsPage() {
                         </div>
                       </TableCell>
 
-                      {/* Campaign Name Badge with Tooltip & Enlarge Modal */}
-                      <TableCell className="py-3.5 max-w-[220px]">
+                      {/* Campaign Name Badge displayed clearly */}
+                      <TableCell className="py-3.5 max-w-[260px]">
                         <div className="flex items-center gap-1.5">
                           <Badge
                             variant="outline"
-                            className="bg-sky-50 text-sky-800 border-sky-200 text-[10px] font-semibold max-w-full inline-flex items-center gap-1 py-1"
+                            className="bg-sky-50 text-sky-800 border-sky-200 text-[10px] font-semibold max-w-full inline-flex items-center gap-1 py-1 px-2.5 whitespace-normal leading-tight text-left break-words"
                           >
-                            <TruncatedTextWithTooltip
-                              text={campaignNameText}
-                              maxLength={22}
-                              className="font-semibold text-sky-800"
-                              onEnlarge={(t) =>
-                                handleOpenEnlargeModal(
-                                  t,
-                                  `Meta Ad Campaign Record for ${lead.full_name}`,
-                                  {
-                                    'Customer Name': lead.full_name,
-                                    'Target Project': lead.project_name,
-                                    'Source Platform': lead.source.toUpperCase(),
-                                    'Lead Status': lead.status,
-                                    'Date Received': lead.created_at,
-                                  }
-                                )
-                              }
-                            />
+                            <span title={campaignNameText} className="line-clamp-2">
+                              {campaignNameText}
+                            </span>
                           </Badge>
                         </div>
                       </TableCell>

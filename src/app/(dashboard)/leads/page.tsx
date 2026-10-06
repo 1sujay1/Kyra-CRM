@@ -693,9 +693,9 @@ export default function LeadsPage() {
                                 {lead.full_name}
                               </div>
                               <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
-                                <span className="flex items-center gap-0.5">
-                                  <MapPin className="h-2.5 w-2.5 text-slate-400" />
-                                  <span>{lead.city}</span>
+                                <span className="flex items-center gap-0.5" title={lead.location || `${lead.city}, ${lead.region || 'Tamil Nadu'}`}>
+                                  <MapPin className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                  <span className="font-medium text-slate-700">{lead.location || `${lead.city}${lead.region ? `, ${lead.region}` : ''}`}</span>
                                 </span>
                                 {lead.email && (
                                   <>

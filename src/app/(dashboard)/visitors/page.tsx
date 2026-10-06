@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Globe,
   Search,
@@ -73,16 +73,18 @@ export default function VisitorLogsPage() {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, ids: string[]) => {
     e.stopPropagation();
     if (userRole !== 'admin') {
       alert('ACCESS DENIED: Only Admin has permission to delete visitor logs.');
       return;
     }
-    if (!confirm('Are you sure you want to delete this visitor log entry?')) return;
+    if (!confirm(`Are you sure you want to delete this visitor log (${ids.length} entries)?`)) return;
 
-    setVisitors((prev) => prev.filter((v) => v.id !== id));
-    await deleteVisitorLogAction(id);
+    setVisitors((prev) => prev.filter((v) => !ids.includes(v.id)));
+    for (const id of ids) {
+      await deleteVisitorLogAction(id);
+    }
   };
 
   const filteredVisitors = visitors.filter((v) => {
@@ -100,6 +102,38 @@ export default function VisitorLogsPage() {
 
     return matchesSearch && matchesDevice;
   });
+
+  // Group similar visitor rows by IP + Project Name + Date
+  const groupedVisitors = useMemo(() => {
+    const map = new Map<string, VisitorLogItem & { total_hits: number; all_ids: string[] }>();
+
+    for (const v of filteredVisitors) {
+      const dateStr = new Date(v.visited_at).toISOString().slice(0, 10);
+      const key = `${v.ip}_${v.project_name}_${dateStr}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          ...v,
+          all_ids: [v.id],
+          total_hits: Math.max(v.visit_count || 1, 1),
+        });
+      } else {
+        const existing = map.get(key)!;
+        existing.all_ids.push(v.id);
+        existing.total_hits = Math.max(existing.total_hits + 1, v.visit_count || 1, existing.all_ids.length);
+        if (new Date(v.visited_at).getTime() > new Date(existing.visited_at).getTime()) {
+          existing.visited_at = v.visited_at;
+          existing.id = v.id;
+          if (v.page_url) existing.page_url = v.page_url;
+          if (v.referrer) existing.referrer = v.referrer;
+        }
+      }
+    }
+
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.visited_at).getTime() - new Date(a.visited_at).getTime()
+    );
+  }, [filteredVisitors]);
 
   // Calculate Metrics
   const totalVisits = visitors.length;
@@ -124,7 +158,7 @@ export default function VisitorLogsPage() {
               <span>Website Visitor Logs & Geo Analytics</span>
             </h2>
             <Badge className="text-[10px] uppercase font-mono tracking-wider bg-slate-900 text-white">
-              First-Time Daily Capture
+              Daily Capped Tracking (Max 4/day)
             </Badge>
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -132,7 +166,7 @@ export default function VisitorLogsPage() {
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time geolocation, IP address, device specs, and origin project tracking for first-time daily landing page visits.
+            Real-time geolocation, IP address, device specs, and origin project tracking for website landing page visits.
           </p>
         </div>
 
@@ -290,11 +324,12 @@ export default function VisitorLogsPage() {
               <TableHeader className="bg-slate-50/90 border-b border-slate-200">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-5">Project Name</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">IP Address</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">IP Address & Hits</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Location & Region</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Total Visits Chip</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Device Specs</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Referrer / Origin</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Visited Date & Time</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Last Visited Time</TableHead>
                   {userRole === 'admin' && (
                     <TableHead className="font-bold text-xs text-slate-800 py-3.5 text-right pr-5">Actions</TableHead>
                   )}
@@ -302,9 +337,9 @@ export default function VisitorLogsPage() {
               </TableHeader>
 
               <TableBody>
-                {filteredVisitors.length === 0 ? (
+                {groupedVisitors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={userRole === 'admin' ? 7 : 6} className="text-center py-20 text-slate-500">
+                    <TableCell colSpan={userRole === 'admin' ? 8 : 7} className="text-center py-20 text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3 max-w-md mx-auto">
                         <div className="h-14 w-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner border border-emerald-100">
                           <Globe className="h-7 w-7" />
@@ -319,7 +354,7 @@ export default function VisitorLogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredVisitors.map((v) => {
+                  groupedVisitors.map((v) => {
                     const visitedDate = new Date(v.visited_at).toLocaleDateString('en-IN', {
                       day: '2-digit',
                       month: 'short',
@@ -337,11 +372,18 @@ export default function VisitorLogsPage() {
                           </span>
                         </TableCell>
 
-                        {/* 2. IP Address */}
+                        {/* 2. IP Address & Count Chip */}
                         <TableCell className="py-3.5">
-                          <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
-                            {v.ip}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
+                              {v.ip}
+                            </span>
+                            {v.total_hits > 1 && (
+                              <Badge className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-2xs">
+                                {v.total_hits} Hits
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
 
                         {/* 3. Location */}
@@ -355,7 +397,15 @@ export default function VisitorLogsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 4. Device Specs */}
+                        {/* 4. Total Visits Count Chip */}
+                        <TableCell className="py-3.5">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold font-mono bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>{v.total_hits} {v.total_hits === 1 ? 'Visit' : 'Visits'}</span>
+                          </span>
+                        </TableCell>
+
+                        {/* 5. Device Specs */}
                         <TableCell className="py-3.5">
                           <div className="flex items-center gap-2">
                             {getDeviceIcon(v.device_type)}
@@ -370,7 +420,7 @@ export default function VisitorLogsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 5. Referrer / Origin */}
+                        {/* 6. Referrer / Origin */}
                         <TableCell className="py-3.5">
                           <div className="flex flex-col max-w-[180px] truncate" title={v.referrer || v.page_url}>
                             <span className="text-xs text-slate-700 truncate font-medium">{v.referrer}</span>
@@ -380,7 +430,7 @@ export default function VisitorLogsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 6. Visited Date & Time */}
+                        {/* 7. Visited Date & Time */}
                         <TableCell className="py-3.5">
                           <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
                             <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -388,14 +438,14 @@ export default function VisitorLogsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 7. Actions (Admin Delete) */}
+                        {/* 8. Actions (Admin Delete) */}
                         {userRole === 'admin' && (
                           <TableCell className="py-3.5 text-right pr-5">
                             <button
                               type="button"
-                              onClick={(e) => handleDelete(e, v.id)}
+                              onClick={(e) => handleDelete(e, v.all_ids)}
                               className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Delete visitor record"
+                              title={`Delete ${v.total_hits} visitor log record(s)`}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

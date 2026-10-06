@@ -82,6 +82,13 @@ export async function POST(req: NextRequest) {
     }
 
     const savedPhone = phoneCheck.isValid ? phoneCheck.formatted : rawPhone;
+    const headerIp = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || '';
+    const ip = body.ip || headerIp || '';
+    const city = body.city || 'Coimbatore';
+    const region = body.region || 'Tamil Nadu';
+    const country = body.country || 'India';
+    const locationStr = [city, region, country].filter(Boolean).join(', ');
+
     const newLeadId = crypto.randomUUID();
     const now = new Date().toISOString();
 
@@ -93,7 +100,11 @@ export async function POST(req: NextRequest) {
       full_name: fullName,
       phone: savedPhone,
       email: email,
-      city: body.city || 'Coimbatore',
+      city: city,
+      region: region,
+      country: country,
+      ip: ip,
+      location: locationStr,
       project_name: projectName,
       source: source,
       campaign_name: campaignName,

@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
     const os = parseOS(userAgent);
 
     const now = new Date().toISOString();
+    const visitCount = Number(body.visit_count) || 1;
     const visitorId = crypto.randomUUID();
 
     const db = await getDatabase();
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
       page_url: pageUrl,
       referrer,
       project_name: projectName,
+      visit_count: visitCount,
       visited_at: now,
       created_at: now,
     });

@@ -56,6 +56,10 @@ export interface LeadDetailed {
   phone: string;
   email: string;
   city: string;
+  region?: string;
+  country?: string;
+  location?: string;
+  ip?: string;
   source: string;
   campaign_name?: string;
   project_name: string;

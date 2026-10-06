@@ -745,7 +745,7 @@ export default function MetaLeadsPage() {
                               onEnlarge={(t) =>
                                 handleOpenEnlargeModal(t, lead.email || 'Meta Lead', {
                                   Phone: lead.phone,
-                                  City: lead.city || 'Coimbatore',
+                                  Location: lead.location || `${lead.city || 'Coimbatore'}, ${lead.region || 'Tamil Nadu'}`,
                                   Project: lead.project_name,
                                   Status: lead.status,
                                 }, 'text')

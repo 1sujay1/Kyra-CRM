@@ -65,12 +65,21 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
       let rawSrc = (l.source || '').toLowerCase();
       let src = (!rawSrc || rawSrc === 'webhook' || rawSrc === 'website' || rawSrc === 'landing_page') ? 'contact_form' : l.source;
 
+      let city = l.city || 'Coimbatore';
+      let region = l.region || 'Tamil Nadu';
+      let country = l.country || 'India';
+      let locationStr = l.location || `${city}${region ? `, ${region}` : ''}`;
+
       return {
         id: currentLeadId,
         full_name: l.full_name,
         phone: l.phone,
         email: l.email || '',
-        city: l.city || 'Coimbatore',
+        city: city,
+        region: region,
+        country: country,
+        location: locationStr,
+        ip: l.ip || '',
         source: src,
         campaign_name: l.campaign_name || '',
         project_name: projName,
@@ -128,6 +137,10 @@ export async function createLeadAction(newLead: LeadDetailed): Promise<{ success
       phone: newLead.phone,
       email: newLead.email || '',
       city: newLead.city || 'Coimbatore',
+      region: newLead.region || 'Tamil Nadu',
+      country: newLead.country || 'India',
+      location: newLead.location || `${newLead.city || 'Coimbatore'}, ${newLead.region || 'Tamil Nadu'}`,
+      ip: newLead.ip || '',
       project_name: newLead.project_name,
       source: newLead.source || 'manual',
       campaign_name: newLead.campaign_name || '',

@@ -19,6 +19,7 @@ export interface VisitorLogItem {
   page_url?: string;
   referrer?: string;
   project_name: string;
+  visit_count?: number;
   visited_at: string;
 }
 
@@ -52,6 +53,7 @@ export async function fetchVisitorLogsAction(): Promise<VisitorLogItem[]> {
       page_url: log.page_url || '',
       referrer: log.referrer || 'Direct Visit',
       project_name: log.project_name || 'Kyra Farmlands',
+      visit_count: Number(log.visit_count) || 1,
       visited_at: log.visited_at || new Date().toISOString(),
     }));
   } catch (err: any) {

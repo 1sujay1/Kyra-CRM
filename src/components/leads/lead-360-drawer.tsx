@@ -458,7 +458,7 @@ export function Lead360Drawer({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Preferred Farmland Project</Label>
+                  <Label className="text-xs">Project Name</Label>
                   <select
                     value={formData.project_name}
                     onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}

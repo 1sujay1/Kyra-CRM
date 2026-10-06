@@ -10,6 +10,7 @@ import {
   X,
   MapPin,
   Megaphone,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +29,7 @@ export function AppSidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
-  // Core operational menu: Leads, Meta Campaigns, Farmland Projects, Site Visits, Bookings
+  // Core operational menu: Leads, Meta Campaigns, Visitor Logs, Farmland Projects, Site Visits, Bookings
   const navItems = [
     {
       title: 'Leads Pipeline',
@@ -41,6 +42,12 @@ export function AppSidebar({
       href: '/meta-leads',
       icon: Megaphone,
       roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
+    },
+    {
+      title: 'Visitor Logs',
+      href: '/visitors',
+      icon: Globe,
+      roles: ['admin', 'manager', 'sales_executive', 'digital_marketing'],
     },
     {
       title: 'Farmland Projects',

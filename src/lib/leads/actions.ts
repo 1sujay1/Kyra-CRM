@@ -57,15 +57,23 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
         }))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+      let projName = l.project_name || 'Kyra Farmlands';
+      if (projName === 'KYRA_GROUP_INDIA' || projName === 'KYRA GROUP INDIA') {
+        projName = 'Kyra Farmlands';
+      }
+
+      let rawSrc = (l.source || '').toLowerCase();
+      let src = (!rawSrc || rawSrc === 'webhook' || rawSrc === 'website' || rawSrc === 'landing_page') ? 'contact_form' : l.source;
+
       return {
         id: currentLeadId,
         full_name: l.full_name,
         phone: l.phone,
         email: l.email || '',
         city: l.city || 'Coimbatore',
-        source: l.source || 'manual',
+        source: src,
         campaign_name: l.campaign_name || '',
-        project_name: l.project_name || 'Anaikatti Green Acres',
+        project_name: projName,
         budget_range: l.budget_range || '₹35L - ₹50L',
         purpose: l.purpose || 'farmhouse',
         status: l.status || 'new',

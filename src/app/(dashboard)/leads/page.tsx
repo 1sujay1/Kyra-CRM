@@ -305,7 +305,7 @@ export default function LeadsPage() {
       'Phone',
       'Email',
       'City',
-      'Farmland Project',
+      'Project Name',
       'Source',
       'Campaign',
       'Purpose',
@@ -348,7 +348,7 @@ export default function LeadsPage() {
     if (filter === 'all') return true;
     if (filter === 'meta') return leadSource === 'meta';
     if (filter === 'google') return leadSource === 'google';
-    if (filter === 'online') return leadSource === 'webhook' || leadSource === 'website' || leadSource === 'zapier';
+    if (filter === 'online') return leadSource === 'webhook' || leadSource === 'website' || leadSource === 'contact_form' || leadSource === 'zapier';
     if (filter === 'direct') return leadSource === 'manual' || leadSource === 'walk_in' || leadSource === 'referral';
     return leadSource === filter;
   };
@@ -417,7 +417,7 @@ export default function LeadsPage() {
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time lead tracking across social media campaigns, Google search ads, webhooks, and direct enquiries.
+            Real-time lead tracking across social media campaigns, Google search ads, contact form submissions, and direct enquiries.
           </p>
         </div>
 
@@ -504,12 +504,12 @@ export default function LeadsPage() {
           </div>
         </Link>
 
-        {/* Card 3: Google Ads / Webhooks */}
+        {/* Card 3: Google Ads / Contact Forms */}
         <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Google & Webhooks
+              Google & Contact Forms
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-semibold border border-amber-200">
               High Intent
@@ -517,9 +517,9 @@ export default function LeadsPage() {
           </div>
           <div className="mt-2.5">
             <div className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">
-              {leads.filter((l) => l.source === 'google' || l.source === 'webhook' || l.source === 'website').length}
+              {leads.filter((l) => l.source === 'google' || l.source === 'webhook' || l.source === 'website' || l.source === 'contact_form').length}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Direct Search & Website Enquiries</p>
+            <p className="text-[11px] text-slate-500 mt-1">Direct Search & Website Contact Enquiries</p>
           </div>
         </div>
 
@@ -578,7 +578,7 @@ export default function LeadsPage() {
                 { id: 'all', label: 'All Sources' },
                 { id: 'meta', label: 'Meta Ads' },
                 { id: 'google', label: 'Google Search' },
-                { id: 'online', label: 'Online / Webhooks' },
+                { id: 'online', label: 'Contact Forms' },
                 { id: 'direct', label: 'Direct / Walk-In' },
               ].map((item) => (
                 <Button
@@ -626,7 +626,7 @@ export default function LeadsPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-5">Buyer</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Contact</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Farmland Project</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Project Name</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Source / Channel</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Budget & Fit</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Quality</TableHead>
@@ -750,7 +750,7 @@ export default function LeadsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 3. Farmland Project */}
+                        {/* 3. Project Name */}
                         <TableCell className="py-3">
                           <span
                             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
@@ -760,7 +760,7 @@ export default function LeadsPage() {
                                 ? 'bg-amber-50 text-amber-800 border-amber-200/80'
                                 : isSiruvani
                                 ? 'bg-sky-50 text-sky-800 border-sky-200/80'
-                                : 'bg-slate-50 text-slate-700 border-slate-200'
+                                : 'bg-teal-50 text-teal-800 border-teal-200/80'
                             }`}
                           >
                             <span>{lead.project_name}</span>
@@ -777,8 +777,8 @@ export default function LeadsPage() {
                                   ? 'bg-blue-50 text-blue-700 border-blue-200'
                                   : lead.source === 'google'
                                   ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : lead.source === 'webhook' || lead.source === 'website'
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : lead.source === 'contact_form' || lead.source === 'webhook' || lead.source === 'website'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                   : 'bg-slate-100 text-slate-700 border-slate-200'
                               }`}
                             >
@@ -786,8 +786,8 @@ export default function LeadsPage() {
                                 ? 'Meta Ads'
                                 : lead.source === 'google'
                                 ? 'Google Ads'
-                                : lead.source === 'webhook' || lead.source === 'website'
-                                ? 'Online Webhook'
+                                : lead.source === 'contact_form' || lead.source === 'webhook' || lead.source === 'website'
+                                ? 'Contact Form'
                                 : 'Direct / Walk-In'}
                             </Badge>
                             {lead.campaign_name && (

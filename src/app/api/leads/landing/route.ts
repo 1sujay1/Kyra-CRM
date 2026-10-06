@@ -138,26 +138,23 @@ export async function POST(req: NextRequest) {
       created_at: now,
     });
 
-    // Trigger Nodemailer Email Notification (Awaited to ensure completion)
-    try {
-      const emailResult = await sendLeadEmailNotification({
-        lead_id: newLeadId,
-        full_name: fullName,
-        phone: savedPhone,
-        email: email,
-        project_name: projectName,
-        source: 'Website Contact Form',
-        campaign_name: campaignName,
-        budget_range: budgetRange,
-        purpose: purpose,
-        message: message,
-        visit_date: body.visit_date || null,
-        page_url: pageUrl,
-      });
-      console.log('[Landing API] Email dispatch result:', emailResult);
-    } catch (mailErr) {
-      console.error('[Landing API] Email dispatch exception:', mailErr);
-    }
+    // Trigger Nodemailer Email Notification asynchronously (non-blocking for fast 50ms client response)
+    sendLeadEmailNotification({
+      lead_id: newLeadId,
+      full_name: fullName,
+      phone: savedPhone,
+      email: email,
+      project_name: projectName,
+      source: 'Website Contact Form',
+      campaign_name: campaignName,
+      budget_range: budgetRange,
+      purpose: purpose,
+      message: message,
+      visit_date: body.visit_date || null,
+      page_url: pageUrl,
+    })
+      .then((res) => console.log('[Landing API] Async email dispatched successfully:', res))
+      .catch((mailErr) => console.error('[Landing API] Async email dispatch exception:', mailErr));
 
     return NextResponse.json(
       {

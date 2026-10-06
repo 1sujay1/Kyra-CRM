@@ -58,12 +58,23 @@ export async function sendLeadEmailNotification(params: LeadNotificationParams) 
     phone: params.phone,
   });
 
+  const mailUser = mailEmail.trim();
+  const mailPassword = mailPass.trim().replace(/\s+/g, '');
+
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
-      user: mailEmail,
-      pass: mailPass,
+      user: mailUser,
+      pass: mailPassword,
     },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 
   const htmlContent = `

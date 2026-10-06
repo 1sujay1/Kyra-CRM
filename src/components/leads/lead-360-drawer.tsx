@@ -69,6 +69,7 @@ export interface LeadDetailed {
   quality: 'hot' | 'warm' | 'cold';
   assigned_to_name: string;
   created_at: string;
+  scheduled_visit_date?: string | null;
   status_history: StatusHistoryItem[];
   activities: ActivityItem[];
 }
@@ -257,6 +258,13 @@ export function Lead360Drawer({
                   </>
                 )}
               </p>
+
+              {lead.scheduled_visit_date && (
+                <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs font-medium shadow-sm">
+                  <Calendar className="h-3.5 w-3.5 text-amber-300" />
+                  <span>Scheduled Site Visit: <strong className="text-amber-100">{new Date(lead.scheduled_visit_date).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

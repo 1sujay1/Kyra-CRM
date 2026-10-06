@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   CalendarCheck,
+  Calendar,
   PhoneCall,
   Edit,
   Trash2,
@@ -1089,6 +1090,24 @@ export default function LeadsPage() {
                             )}
                             <Edit className="h-3 w-3 opacity-60 group-hover:opacity-100" />
                           </button>
+
+                          {/* Scheduled Visit Date Badge */}
+                          {lead.scheduled_visit_date && (
+                            <div
+                              className="flex items-center gap-1 text-[10px] text-amber-900 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md mt-1 font-semibold w-fit shadow-2xs"
+                              title={`Scheduled Site Visit Date & Time: ${new Date(lead.scheduled_visit_date).toLocaleString('en-IN')}`}
+                            >
+                              <Calendar className="h-3 w-3 text-amber-600 shrink-0" />
+                              <span>
+                                {new Date(lead.scheduled_visit_date).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          )}
                         </TableCell>
 
                         {/* 8. Executive */}

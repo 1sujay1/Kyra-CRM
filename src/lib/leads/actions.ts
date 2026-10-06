@@ -21,11 +21,18 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
     }
 
     const leadIds = dbLeads.map((l) => l.id || l._id.toString());
+    const leadPhones = dbLeads.map((l) => l.phone).filter(Boolean);
 
-    // Fetch all related status history & activities in parallel
-    const [allHistory, allActivities] = await Promise.all([
+    // Fetch all related status history, activities & site visits in parallel
+    const [allHistory, allActivities, allVisits] = await Promise.all([
       db.collection('lead_status_history').find({ lead_id: { $in: leadIds } }).toArray(),
       db.collection('activities').find({ lead_id: { $in: leadIds } }).toArray(),
+      db.collection('site_visits').find({
+        $or: [
+          { lead_id: { $in: leadIds } },
+          { visitor_phone: { $in: leadPhones } },
+        ],
+      }).toArray(),
     ]);
 
     const mappedDbLeads: LeadDetailed[] = dbLeads.map((l: any) => {
@@ -56,6 +63,13 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
           created_at: act.created_at,
         }))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      // Map database site visit
+      const leadVisits = allVisits.filter(
+        (v: any) => v.lead_id === currentLeadId || (v.visitor_phone && getCorePhoneDigits(v.visitor_phone) === getCorePhoneDigits(l.phone))
+      );
+      const latestScheduledVisit = leadVisits.find((v: any) => v.status === 'scheduled') || leadVisits[0];
+      const scheduledVisitDate = latestScheduledVisit ? latestScheduledVisit.scheduled_at : (l.scheduled_visit_date || null);
 
       let projName = l.project_name || 'Kyra Farmlands';
       if (projName === 'KYRA_GROUP_INDIA' || projName === 'KYRA GROUP INDIA') {
@@ -89,6 +103,7 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
         quality: l.quality || 'warm',
         assigned_to_name: l.assigned_to_name || 'Priya Raman',
         created_at: l.created_at,
+        scheduled_visit_date: scheduledVisitDate,
         status_history: dbHistory,
         activities: dbActivities,
       };

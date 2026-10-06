@@ -235,12 +235,27 @@ export function Lead360Drawer({
                   {lead.quality}
                 </Badge>
               </div>
-              <p className="text-xs text-emerald-200 mt-1 flex items-center gap-3">
+              <p className="text-xs text-emerald-200 mt-1 flex flex-wrap items-center gap-3">
                 <span className="flex items-center gap-1 font-mono">{lead.phone}</span>
+                {lead.email && (
+                  <>
+                    <span>•</span>
+                    <span>{lead.email}</span>
+                  </>
+                )}
                 <span>•</span>
-                <span>{lead.email}</span>
-                <span>•</span>
-                <span>{lead.city}</span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-emerald-400 shrink-0" />
+                  <span>{lead.location || `${lead.city}${lead.region ? `, ${lead.region}` : ''}`}</span>
+                </span>
+                {lead.ip && (
+                  <>
+                    <span>•</span>
+                    <span className="font-mono bg-emerald-800/80 px-2 py-0.5 rounded text-[11px] text-emerald-100 border border-emerald-700">
+                      IP: {lead.ip}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
 
@@ -258,10 +273,15 @@ export function Lead360Drawer({
           </div>
 
           {/* Quick Badges Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-4 border-t border-emerald-800/80 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 pt-4 border-t border-emerald-800/80 text-xs">
             <div>
               <span className="text-emerald-300 text-[10px] block">Project</span>
               <span className="font-semibold">{lead.project_name}</span>
+            </div>
+            <div>
+              <span className="text-emerald-300 text-[10px] block">Location / IP</span>
+              <span className="font-semibold block truncate" title={lead.location || lead.city}>{lead.location || lead.city}</span>
+              {lead.ip && <span className="font-mono text-[10px] text-emerald-200 block">({lead.ip})</span>}
             </div>
             <div>
               <span className="text-emerald-300 text-[10px] block">Purpose</span>

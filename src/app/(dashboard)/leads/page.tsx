@@ -26,6 +26,11 @@ import {
   Shield,
   CheckCircle2,
   AlertCircle,
+  FileText,
+  Printer,
+  CheckSquare,
+  Square,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,6 +111,11 @@ export default function LeadsPage() {
 
   // New Lead Modal State
   const [newLeadModalOpen, setNewLeadModalOpen] = useState(false);
+
+  // Multi-select & Bulk Actions State
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Load leads from server & database
   const loadData = useCallback(async (showLoadingSpinner = false) => {
@@ -297,53 +307,7 @@ export default function LeadsPage() {
       setTimeout(() => setScheduleSuccessMsg(null), 5000);
     }
   };
-
-  // Export CSV
-  const handleExportCSV = () => {
-    const headers = [
-      'Buyer Name',
-      'Phone',
-      'Email',
-      'City',
-      'Project Name',
-      'Source',
-      'Campaign',
-      'Purpose',
-      'Budget',
-      'Quality',
-      'Status',
-      'Assigned Executive',
-      'Created At',
-    ];
-
-    const rows = leads.map((l) => [
-      `"${l.full_name}"`,
-      `"${l.phone}"`,
-      `"${l.email}"`,
-      `"${l.city}"`,
-      `"${l.project_name}"`,
-      `"${l.source}"`,
-      `"${l.campaign_name || ''}"`,
-      `"${l.purpose}"`,
-      `"${l.budget_range}"`,
-      `"${l.quality}"`,
-      `"${l.status}"`,
-      `"${l.assigned_to_name}"`,
-      `"${l.created_at}"`,
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `kyra_farmland_leads_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Source filters
+  // Source filters helper
   const sourceMatches = (leadSource: string, filter: string) => {
     if (filter === 'all') return true;
     if (filter === 'meta') return leadSource === 'meta';
@@ -370,6 +334,231 @@ export default function LeadsPage() {
 
     return matchesSearch && matchesSource && matchesStage;
   });
+
+  // Selection helper states & functions
+  const isAllFilteredSelected =
+    filteredLeads.length > 0 &&
+    filteredLeads.every((l) => selectedLeadIds.includes(l.id));
+
+  const isSomeFilteredSelected =
+    filteredLeads.some((l) => selectedLeadIds.includes(l.id)) && !isAllFilteredSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllFilteredSelected) {
+      const filteredSet = new Set(filteredLeads.map((l) => l.id));
+      setSelectedLeadIds((prev) => prev.filter((id) => !filteredSet.has(id)));
+    } else {
+      const newSelected = new Set([...selectedLeadIds, ...filteredLeads.map((l) => l.id)]);
+      setSelectedLeadIds(Array.from(newSelected));
+    }
+  };
+
+  const handleToggleSelectRow = (e: React.SyntheticEvent, id: string) => {
+    e.stopPropagation();
+    setSelectedLeadIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleClearSelection = () => {
+    setSelectedLeadIds([]);
+  };
+
+  // Export CSV (Selected or Filtered)
+  const handleExportCSV = (targetLeads?: LeadDetailed[]) => {
+    const leadsToExport =
+      targetLeads ||
+      (selectedLeadIds.length > 0
+        ? leads.filter((l) => selectedLeadIds.includes(l.id))
+        : filteredLeads);
+
+    if (leadsToExport.length === 0) {
+      alert('No leads available to export.');
+      return;
+    }
+
+    const headers = [
+      'Buyer Name',
+      'Phone',
+      'Email',
+      'City/Location',
+      'Visitor IP',
+      'Project Name',
+      'Source',
+      'Campaign',
+      'Purpose',
+      'Budget',
+      'Quality',
+      'Status',
+      'Assigned Executive',
+      'Created At',
+    ];
+
+    const rows = leadsToExport.map((l) => [
+      `"${l.full_name}"`,
+      `"${l.phone}"`,
+      `"${l.email || ''}"`,
+      `"${l.city || ''}"`,
+      `"${l.ip || ''}"`,
+      `"${l.project_name}"`,
+      `"${l.source}"`,
+      `"${l.campaign_name || ''}"`,
+      `"${l.purpose}"`,
+      `"${l.budget_range}"`,
+      `"${l.quality}"`,
+      `"${l.status}"`,
+      `"${l.assigned_to_name}"`,
+      `"${l.created_at}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `kyra_farmland_leads_${selectedLeadIds.length > 0 ? 'selected' : 'all'}_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export PDF (Print-ready Kyra Group HTML Template)
+  const handleExportPDF = (targetLeads?: LeadDetailed[]) => {
+    const leadsToExport =
+      targetLeads ||
+      (selectedLeadIds.length > 0
+        ? leads.filter((l) => selectedLeadIds.includes(l.id))
+        : filteredLeads);
+
+    if (leadsToExport.length === 0) {
+      alert('No leads available to export.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1100,height=850');
+    if (!printWindow) {
+      alert('Please allow popups in your browser to generate the PDF report.');
+      return;
+    }
+
+    const rowsHtml = leadsToExport
+      .map(
+        (l, index) => `
+        <tr>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 11px; font-weight: bold;">${index + 1}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; color: #0f172a;">${l.full_name}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-family: monospace;">${l.phone}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10px; color: #475569;">${l.city || 'N/A'}${l.ip ? `<br/><span style="font-family: monospace; font-size: 9px; color: #64748b;">IP: ${l.ip}</span>` : ''}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 600; color: #065f46;">${l.project_name}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10px; text-transform: uppercase;">${l.source}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10px; text-transform: uppercase; font-weight: bold; color: ${l.quality === 'hot' ? '#b91c1c' : l.quality === 'warm' ? '#b45309' : '#475569'};">${l.quality}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10px; font-weight: 600; text-transform: capitalize;">${l.status.replace(/_/g, ' ')}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10px; color: #475569;">${new Date(l.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+        </tr>
+      `
+      )
+      .join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Kyra Group - Farmlands Lead Report (${new Date().toLocaleDateString('en-IN')})</title>
+          <style>
+            @media print {
+              @page { size: landscape; margin: 12mm; }
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1e293b; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #047857; padding-bottom: 12px; margin-bottom: 16px; }
+            .logo-title { font-size: 20px; font-weight: 800; color: #065f46; letter-spacing: -0.5px; }
+            .subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
+            .meta-info { text-align: right; font-size: 11px; color: #475569; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th { background-color: #f1f5f9; color: #334155; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; }
+            .footer { margin-top: 24px; pt-3; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="logo-title">🌿 KYRA GROUP FARMLANDS</div>
+              <div class="subtitle">Leads Report • Exported ${leadsToExport.length} Record(s)</div>
+            </div>
+            <div class="meta-info">
+              <div><strong>Generated Date:</strong> ${new Date().toLocaleString('en-IN')}</div>
+              <div><strong>System:</strong> Kyra CRM Live Database</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30px; text-align: center;">#</th>
+                <th>Buyer Name</th>
+                <th>Phone</th>
+                <th>Location / IP</th>
+                <th>Project</th>
+                <th>Source</th>
+                <th>Intent</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <div class="footer">
+            <div>Confidential - Internal Kyra Group CRM Document</div>
+            <div>Page 1 of 1</div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // Bulk Delete Confirmation Handler
+  const handleConfirmBulkDelete = async () => {
+    if (selectedLeadIds.length === 0) return;
+    if (userRole !== 'admin') {
+      alert('ACCESS DENIED: Only Admin (Adminkyra) can perform bulk deletion.');
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    try {
+      const idsToDelete = [...selectedLeadIds];
+
+      const deleteResults = await Promise.all(
+        idsToDelete.map((id) => deleteLeadAction(id))
+      );
+
+      const successCount = deleteResults.filter((r) => r.success).length;
+
+      setLeads((prev) => prev.filter((l) => !idsToDelete.includes(l.id)));
+      setSelectedLeadIds([]);
+      setBulkDeleteModalOpen(false);
+
+      setScheduleSuccessMsg(`Successfully deleted ${successCount} lead(s) from CRM & database.`);
+      setTimeout(() => setScheduleSuccessMsg(null), 5000);
+    } catch (err) {
+      console.error('Failed to bulk delete leads:', err);
+      alert('An error occurred while deleting selected leads.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   // Initials generator
   const getInitials = (name: string) => {
@@ -437,11 +626,21 @@ export default function LeadsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleExportCSV}
+            onClick={() => handleExportCSV()}
             className="gap-1.5 text-xs hover:bg-slate-100 shadow-xs cursor-pointer"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Export CSV</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleExportPDF()}
+            className="gap-1.5 text-xs hover:bg-slate-100 shadow-xs cursor-pointer text-rose-700 hover:text-rose-800 border-rose-200 hover:bg-rose-50"
+          >
+            <FileText className="h-3.5 w-3.5 text-rose-600" />
+            <span>Export PDF</span>
           </Button>
 
           <Button
@@ -624,7 +823,19 @@ export default function LeadsPage() {
             <Table>
               <TableHeader className="bg-slate-50/90 border-b border-slate-200">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-5">Buyer</TableHead>
+                  <TableHead className="w-[45px] pl-4 py-3.5">
+                    <input
+                      type="checkbox"
+                      checked={isAllFilteredSelected}
+                      ref={(input) => {
+                        if (input) input.indeterminate = isSomeFilteredSelected;
+                      }}
+                      onChange={handleToggleSelectAll}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                      title="Select / Deselect all visible leads"
+                    />
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-2">Buyer</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Contact</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Project Name</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Source / Channel</TableHead>
@@ -641,7 +852,7 @@ export default function LeadsPage() {
               <TableBody>
                 {filteredLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-20 text-slate-500">
+                    <TableCell colSpan={10} className="text-center py-20 text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-3 max-w-md mx-auto">
                         <div className="h-14 w-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner border border-emerald-100">
                           <Users className="h-7 w-7" />
@@ -677,13 +888,25 @@ export default function LeadsPage() {
                       <TableRow
                         key={lead.id}
                         onClick={() => handleOpen360(lead)}
-                        className="group hover:bg-slate-50/80 transition-all duration-200 cursor-pointer border-b border-slate-100"
+                        className={`group hover:bg-slate-50/80 transition-all duration-200 cursor-pointer border-b border-slate-100 ${
+                          selectedLeadIds.includes(lead.id) ? 'bg-emerald-50/40' : ''
+                        }`}
                         style={{
                           animationDelay: `${Math.min(index * 40, 400)}ms`,
                         }}
                       >
+                        {/* Checkbox cell */}
+                        <TableCell className="pl-4 py-3 w-[45px]" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedLeadIds.includes(lead.id)}
+                            onChange={(e) => handleToggleSelectRow(e, lead.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                          />
+                        </TableCell>
+
                         {/* 1. Buyer Name & Location */}
-                        <TableCell className="py-3 pl-5">
+                        <TableCell className="py-3 pl-2">
                           <div className="flex items-center gap-3">
                             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0 group-hover:scale-105 transition-transform">
                               {getInitials(lead.full_name)}
@@ -692,15 +915,23 @@ export default function LeadsPage() {
                               <div className="font-semibold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
                                 {lead.full_name}
                               </div>
-                              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
+                              <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
                                 <span className="flex items-center gap-0.5" title={lead.location || `${lead.city}, ${lead.region || 'Tamil Nadu'}`}>
                                   <MapPin className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                   <span className="font-medium text-slate-700">{lead.location || `${lead.city}${lead.region ? `, ${lead.region}` : ''}`}</span>
                                 </span>
+                                {lead.ip && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-600 border border-slate-200/80 font-medium" title={`Visitor IP Address: ${lead.ip}`}>
+                                      IP: {lead.ip}
+                                    </span>
+                                  </>
+                                )}
                                 {lead.email && (
                                   <>
                                     <span>•</span>
-                                    <span className="truncate max-w-[130px] flex items-center gap-0.5" title={lead.email}>
+                                    <span className="truncate max-w-[130px] flex items-center gap-0.5 text-slate-500" title={lead.email}>
                                       <Mail className="h-2.5 w-2.5 text-slate-400" />
                                       {lead.email}
                                     </span>
@@ -969,6 +1200,109 @@ export default function LeadsPage() {
         }))}
         preselectedLead={scheduleVisitLead}
       />
+
+      {/* Floating Bulk Action Bar */}
+      {selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 animate-in fade-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-2 pr-3 border-r border-slate-700 font-semibold text-sm text-emerald-400">
+            <CheckSquare className="h-4 w-4" />
+            <span>{selectedLeadIds.length} lead(s) selected</span>
+          </div>
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleExportCSV()}
+            className="text-xs text-slate-200 hover:text-white hover:bg-slate-800 gap-1.5 cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Export CSV</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleExportPDF()}
+            className="text-xs text-slate-200 hover:text-white hover:bg-slate-800 gap-1.5 cursor-pointer"
+          >
+            <FileText className="h-3.5 w-3.5 text-rose-400" />
+            <span>Export PDF</span>
+          </Button>
+
+          {userRole === 'admin' && (
+            <Button
+              size="sm"
+              onClick={() => setBulkDeleteModalOpen(true)}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold gap-1.5 shadow-md shadow-rose-900/30 cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete ({selectedLeadIds.length})</span>
+            </Button>
+          )}
+
+          <button
+            onClick={handleClearSelection}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+            title="Clear selection"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Delete Modal */}
+      {bulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-50 rounded-xl">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-lg">
+                  Delete {selectedLeadIds.length} Selected Leads?
+                </h3>
+                <p className="text-xs text-slate-500">
+                  This action will permanently delete these leads from the Supabase database and CRM records.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl text-xs text-rose-900">
+              ⚠️ <strong>Warning:</strong> Deleting leads cannot be undone. All notes, status logs, and visitor info for these leads will be deleted.
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setBulkDeleteModalOpen(false)}
+                disabled={isBulkDeleting}
+                className="text-xs cursor-pointer"
+              >
+                Cancel
+              </Button>
+
+              <Button
+                onClick={handleConfirmBulkDelete}
+                disabled={isBulkDeleting}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold gap-1.5 shadow-md shadow-rose-600/20 cursor-pointer"
+              >
+                {isBulkDeleting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deleting {selectedLeadIds.length} Leads...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Confirm Permanent Deletion</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { LeadDetailed } from '@/components/leads/lead-360-drawer';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
+import { sendLeadEmailNotification } from '@/lib/email/nodemailer';
 
 // GET: Meta Webhook verification handshake or health status
 export async function GET(req: NextRequest) {
@@ -259,6 +260,24 @@ export async function POST(req: NextRequest) {
       }
     } catch (e: any) {
       console.warn('[Webhook] MongoDB connection notice:', e.message);
+    }
+
+    // Trigger Nodemailer Email Notification for Meta/Webhook Leads
+    try {
+      const emailResult = await sendLeadEmailNotification({
+        lead_id: newLead.id,
+        full_name: newLead.full_name,
+        phone: newLead.phone,
+        email: newLead.email,
+        project_name: newLead.project_name,
+        source: source === 'meta' ? 'Meta Lead Ads' : source === 'google' ? 'Google Ads' : 'Incoming Webhook',
+        campaign_name: newLead.campaign_name,
+        budget_range: newLead.budget_range,
+        purpose: newLead.purpose,
+      });
+      console.log('[Webhook API] Email dispatch result:', emailResult);
+    } catch (mailErr) {
+      console.error('[Webhook API] Email dispatch exception:', mailErr);
     }
 
     return NextResponse.json({

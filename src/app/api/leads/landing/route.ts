@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
+import { sendLeadEmailNotification } from '@/lib/email/nodemailer';
 
 // Helper CORS headers for cross-origin landing page requests
 function corsHeaders() {
@@ -125,6 +126,27 @@ export async function POST(req: NextRequest) {
       created_by: 'Website Landing Page API',
       created_at: now,
     });
+
+    // Trigger Nodemailer Email Notification (Awaited to ensure completion)
+    try {
+      const emailResult = await sendLeadEmailNotification({
+        lead_id: newLeadId,
+        full_name: fullName,
+        phone: savedPhone,
+        email: email,
+        project_name: projectName,
+        source: 'Website Contact Form',
+        campaign_name: campaignName,
+        budget_range: budgetRange,
+        purpose: purpose,
+        message: message,
+        visit_date: body.visit_date || null,
+        page_url: pageUrl,
+      });
+      console.log('[Landing API] Email dispatch result:', emailResult);
+    } catch (mailErr) {
+      console.error('[Landing API] Email dispatch exception:', mailErr);
+    }
 
     return NextResponse.json(
       {

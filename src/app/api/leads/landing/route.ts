@@ -19,8 +19,17 @@ export async function OPTIONS() {
 
 // POST: Landing Page Contact Form Lead Submission
 export async function POST(req: NextRequest) {
+  console.log('📥 [CRM Landing API Step 1] Incoming POST request received:', {
+    url: req.url,
+    method: req.method,
+    origin: req.headers.get('origin'),
+    referer: req.headers.get('referer'),
+    userAgent: req.headers.get('user-agent'),
+  });
+
   try {
     const body = await req.json();
+    console.log('📦 [CRM Landing API Step 2] Parsed JSON body:', body);
 
     const fullName = (body.name || body.full_name || body.buyer_name || '').trim();
     const rawPhone = (body.phone || body.mobile || body.phone_number || '').trim();
@@ -44,7 +53,10 @@ export async function POST(req: NextRequest) {
     const rawSource = (body.source || '').trim().toLowerCase();
     const source = (!rawSource || rawSource === 'webhook' || rawSource === 'website' || rawSource === 'landing_page') ? 'contact_form' : rawSource;
 
+    console.log('👤 [CRM Landing API Step 3] Extracted fields:', { fullName, rawPhone, email, projectName, source, campaignName });
+
     if (!fullName || !rawPhone) {
+      console.warn('⚠️ [CRM Landing API Step 3 REJECTED] Missing required name or phone number.');
       return NextResponse.json(
         { success: false, status: 400, message: 'Name and phone number are required.' },
         { status: 400, headers: corsHeaders() }
@@ -55,6 +67,8 @@ export async function POST(req: NextRequest) {
     const phoneCheck = validateIndianPhoneNumber(rawPhone);
     let leadStatus: 'new' | 'number_not_valid' | 'duplicate_number' = 'new';
     let statusComment = `Ingested from Website Landing Page Enquiry`;
+
+    console.log('📱 [CRM Landing API Step 4] Phone check result:', phoneCheck);
 
     if (!phoneCheck.isValid) {
       leadStatus = 'number_not_valid';
@@ -75,9 +89,10 @@ export async function POST(req: NextRequest) {
         if (existingDb && existingDb.length > 0) {
           leadStatus = 'duplicate_number';
           statusComment = `Duplicate website lead received for phone ${phoneCheck.formatted}`;
+          console.log('ℹ️ [CRM Landing API Step 4] Flagged as duplicate number.');
         }
       } catch (err: any) {
-        console.warn('[Landing API] Duplicate check notice:', err?.message);
+        console.warn('⚠️ [CRM Landing API Step 4] Duplicate check notice:', err?.message);
       }
     }
 
@@ -92,6 +107,7 @@ export async function POST(req: NextRequest) {
     const newLeadId = crypto.randomUUID();
     const now = new Date().toISOString();
 
+    console.log('🗄️ [CRM Landing API Step 5] Connecting to MongoDB and saving lead:', { newLeadId, leadStatus });
     const db = await getDatabase();
 
     // Insert into leads collection
@@ -138,7 +154,10 @@ export async function POST(req: NextRequest) {
       created_at: now,
     });
 
-    // Trigger Nodemailer Email Notification asynchronously (non-blocking for fast 50ms client response)
+    console.log('✅ [CRM Landing API Step 5] MongoDB records created successfully for lead ID:', newLeadId);
+
+    // Trigger Nodemailer Email Notification
+    console.log('📧 [CRM Landing API Step 6] Dispatching Nodemailer email notification async...');
     sendLeadEmailNotification({
       lead_id: newLeadId,
       full_name: fullName,
@@ -153,8 +172,10 @@ export async function POST(req: NextRequest) {
       visit_date: body.visit_date || null,
       page_url: pageUrl,
     })
-      .then((res) => console.log('[Landing API] Async email dispatched successfully:', res))
-      .catch((mailErr) => console.error('[Landing API] Async email dispatch exception:', mailErr));
+      .then((res) => console.log('✅ [CRM Landing API Step 6 SUCCESS] Email notification dispatched:', res))
+      .catch((mailErr) => console.error('❌ [CRM Landing API Step 6 FAILURE] Email notification exception:', mailErr));
+
+    console.log('🎉 [CRM Landing API Step 7] Responding HTTP 200 OK to client.');
 
     return NextResponse.json(
       {
@@ -174,7 +195,7 @@ export async function POST(req: NextRequest) {
       { status: 200, headers: corsHeaders() }
     );
   } catch (error: any) {
-    console.error('[Landing API] Submission error:', error);
+    console.error('💥 [CRM Landing API CATCH] Submission error:', { message: error?.message, stack: error?.stack });
     return NextResponse.json(
       {
         success: false,

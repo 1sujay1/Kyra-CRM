@@ -10,6 +10,25 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login');
   const isApiRoute = request.nextUrl.pathname.startsWith('/api');
 
+  if (isApiRoute) {
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        },
+      });
+    }
+
+    const apiRes = NextResponse.next();
+    apiRes.headers.set('Access-Control-Allow-Origin', '*');
+    apiRes.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    apiRes.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    return apiRes;
+  }
+
   if (!isAuthenticated && !isAuthRoute && !isApiRoute && request.nextUrl.pathname !== '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/login';

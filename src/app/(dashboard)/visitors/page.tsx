@@ -115,12 +115,12 @@ export default function VisitorLogsPage() {
         map.set(key, {
           ...v,
           all_ids: [v.id],
-          total_hits: Math.max(v.visit_count || 1, 1),
+          total_hits: 1,
         });
       } else {
         const existing = map.get(key)!;
         existing.all_ids.push(v.id);
-        existing.total_hits = Math.max(existing.total_hits + 1, v.visit_count || 1, existing.all_ids.length);
+        existing.total_hits = existing.all_ids.length;
         if (new Date(v.visited_at).getTime() > new Date(existing.visited_at).getTime()) {
           existing.visited_at = v.visited_at;
           existing.id = v.id;
@@ -184,10 +184,16 @@ export default function VisitorLogsPage() {
         </div>
       </div>
 
-      {/* METRIC CARDS */}
+      {/* METRIC CARDS WITH CLICK TO FILTER */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Card 1: Total Visits */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300">
+        <div
+          onClick={() => setSelectedDeviceFilter('all')}
+          className={`group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer ${
+            selectedDeviceFilter === 'all' ? 'border-emerald-500 ring-2 ring-emerald-600/30' : 'border-slate-200/80 hover:border-emerald-300'
+          }`}
+          title="Click to show all visitor logs"
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -206,7 +212,13 @@ export default function VisitorLogsPage() {
         </div>
 
         {/* Card 2: Unique IPs */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300">
+        <div
+          onClick={() => setSelectedDeviceFilter('all')}
+          className={`group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer ${
+            selectedDeviceFilter === 'all' ? 'border-sky-500 ring-2 ring-sky-600/30' : 'border-slate-200/80 hover:border-sky-300'
+          }`}
+          title="Click to show all unique IP visitor logs"
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-500 to-blue-500" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -225,7 +237,13 @@ export default function VisitorLogsPage() {
         </div>
 
         {/* Card 3: Mobile Traffic */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300">
+        <div
+          onClick={() => setSelectedDeviceFilter('mobile')}
+          className={`group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer ${
+            selectedDeviceFilter === 'mobile' ? 'border-purple-500 ring-2 ring-purple-600/30' : 'border-slate-200/80 hover:border-purple-300'
+          }`}
+          title="Click to filter mobile visitors only"
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -246,7 +264,13 @@ export default function VisitorLogsPage() {
         </div>
 
         {/* Card 4: Desktop Traffic */}
-        <div className="group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300">
+        <div
+          onClick={() => setSelectedDeviceFilter('desktop')}
+          className={`group relative overflow-hidden rounded-2xl bg-white p-4 sm:p-5 border shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer ${
+            selectedDeviceFilter === 'desktop' ? 'border-amber-500 ring-2 ring-amber-600/30' : 'border-slate-200/80 hover:border-amber-300'
+          }`}
+          title="Click to filter desktop visitors only"
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -298,7 +322,7 @@ export default function VisitorLogsPage() {
                   onClick={() => setSelectedDeviceFilter(item.id)}
                   className={`text-xs h-8 rounded-lg cursor-pointer transition-all ${
                     selectedDeviceFilter === item.id
-                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs'
+                      ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs font-bold'
                       : 'border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
@@ -324,7 +348,7 @@ export default function VisitorLogsPage() {
               <TableHeader className="bg-slate-50/90 border-b border-slate-200">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-5">Project Name</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">IP Address & Hits</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">IP Address</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Location & Region</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Total Visits Chip</TableHead>
                   <TableHead className="font-bold text-xs text-slate-800 py-3.5">Device Specs</TableHead>
@@ -372,18 +396,11 @@ export default function VisitorLogsPage() {
                           </span>
                         </TableCell>
 
-                        {/* 2. IP Address & Count Chip */}
+                        {/* 2. IP Address */}
                         <TableCell className="py-3.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
-                              {v.ip}
-                            </span>
-                            {v.total_hits > 1 && (
-                              <Badge className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-2xs">
-                                {v.total_hits} Hits
-                              </Badge>
-                            )}
-                          </div>
+                          <span className="font-mono text-xs font-semibold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-md">
+                            {v.ip}
+                          </span>
                         </TableCell>
 
                         {/* 3. Location */}

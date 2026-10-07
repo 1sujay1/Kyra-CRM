@@ -943,42 +943,12 @@ export default function LeadsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 2. Phone + Actions (WhatsApp & Copy) */}
+                        {/* 2. Phone */}
                         <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center">
                             <span className="font-mono text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200/60 px-2 py-1 rounded-md">
-                              {isRevealed ? lead.phone : maskPhone(lead.phone)}
+                              {maskPhone(lead.phone)}
                             </span>
-
-                            {/* Eye reveal toggle */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleRevealPhone(e, lead.id)}
-                              className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                              title={isRevealed ? 'Mask phone number' : 'Reveal full phone number'}
-                            >
-                              {isRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                            </button>
-
-                            {/* Copy button */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleCopyPhone(e, lead.id, lead.phone)}
-                              className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                              title="Copy phone to clipboard"
-                            >
-                              {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                            </button>
-
-                            {/* WhatsApp button */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleWhatsAppClick(e, lead.phone)}
-                              className="text-emerald-600 hover:text-emerald-700 p-1 rounded-md hover:bg-emerald-50 transition-colors cursor-pointer"
-                              title="Chat on WhatsApp"
-                            >
-                              <MessageCircle className="h-3.5 w-3.5 fill-emerald-100 text-emerald-600" />
-                            </button>
                           </div>
                         </TableCell>
 

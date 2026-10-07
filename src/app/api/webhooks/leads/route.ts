@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
       purpose: (['investment', 'farmhouse', 'agriculture'].includes(purpose) ? purpose : 'farmhouse') as 'investment' | 'farmhouse' | 'agriculture',
       status: leadStatus,
       quality: leadStatus === 'number_not_valid' ? 'junk' : (quality as any),
-      assigned_to_name: 'Priya Raman',
+      assigned_to_name: 'Unassigned',
       created_at: new Date().toISOString(),
       status_history: [
         {

@@ -1112,48 +1112,29 @@ export default function LeadsPage() {
 
                         {/* 8. Executive */}
                         <TableCell className="py-3">
-                          <span className="text-xs text-slate-700 font-medium">
-                            {lead.assigned_to_name}
-                          </span>
+                          {lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'Priya Raman' ? (
+                            <span className="text-xs text-slate-700 font-medium">
+                              {lead.assigned_to_name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">
+                              Unassigned
+                            </span>
+                          )}
                         </TableCell>
 
                         {/* 9. Actions */}
                         <TableCell className="py-3 pr-5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            {/* Schedule Visit */}
+                          <div className="flex items-center justify-end">
                             <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => handleDirectScheduleVisit(e, lead)}
-                              className="h-8 w-8 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg cursor-pointer transition-colors"
-                              title="Schedule Farmland Site Visit"
-                            >
-                              <CalendarCheck className="h-4 w-4" />
-                            </Button>
-
-                            {/* Open 360 */}
-                            <Button
-                              variant="ghost"
                               size="sm"
                               onClick={() => handleOpen360(lead)}
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer transition-colors"
+                              className="h-8 px-3 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold gap-1.5 rounded-lg shadow-xs cursor-pointer transition-all"
                               title="Open Lead 360 View"
                             >
-                              <ArrowUpRight className="h-4 w-4" />
+                              <span>Lead 360</span>
+                              <ArrowUpRight className="h-3.5 w-3.5" />
                             </Button>
-
-                            {/* Delete (Admin Only) */}
-                            {userRole === 'admin' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => handleOpenDeleteModal(e, lead)}
-                                className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
-                                title="Delete Lead from CRM & Database (Admin Only)"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
                           </div>
                         </TableCell>
                       </TableRow>

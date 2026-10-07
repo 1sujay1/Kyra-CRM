@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
       purpose: purpose,
       status: leadStatus,
       quality: leadStatus === 'number_not_valid' ? 'junk' : 'warm',
-      assigned_to_name: 'Priya Raman',
+      assigned_to_name: 'Unassigned',
       created_at: now,
       updated_at: now,
     });

@@ -11,6 +11,7 @@ import {
   MapPin,
   Megaphone,
   Globe,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +69,12 @@ export function AppSidebar({
       href: '/bookings',
       icon: CreditCard,
       roles: allRoles,
+    },
+    {
+      title: 'Settings',
+      href: '/settings',
+      icon: Settings,
+      roles: ['admin'], // Admin Dashboard Settings & Executive Management
     },
   ];
 

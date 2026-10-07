@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Globe,
   Search,
@@ -16,6 +17,7 @@ import {
   Shield,
   Activity,
   ArrowUpRight,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,26 +35,31 @@ import { fetchVisitorLogsAction, deleteVisitorLogAction, VisitorLogItem } from '
 import { getCurrentUserAction } from '@/lib/auth/actions';
 
 export default function VisitorLogsPage() {
+  const router = useRouter();
   const [visitors, setVisitors] = useState<VisitorLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('Just now');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDeviceFilter, setSelectedDeviceFilter] = useState<string>('all');
-  const [userRole, setUserRole] = useState<'admin' | 'digital_marketing'>('digital_marketing');
+  const [userRole, setUserRole] = useState<'admin' | 'digital_marketing' | null>(null);
 
   const loadData = useCallback(async (showSpinner = false) => {
     if (showSpinner) setLoading(true);
     setIsRefreshing(true);
     try {
-      const [fetchedLogs, user] = await Promise.all([
-        fetchVisitorLogsAction(),
-        getCurrentUserAction(),
-      ]);
-      setVisitors(fetchedLogs);
-      if (user) {
-        setUserRole(user.role);
+      const user = await getCurrentUserAction();
+      if (!user || user.role !== 'admin') {
+        setUserRole(user ? user.role : null);
+        setLoading(false);
+        setIsRefreshing(false);
+        router.replace('/leads');
+        return;
       }
+
+      setUserRole('admin');
+      const fetchedLogs = await fetchVisitorLogsAction();
+      setVisitors(fetchedLogs);
       setLastSyncedTime(
         new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       );
@@ -62,7 +69,7 @@ export default function VisitorLogsPage() {
       if (showSpinner) setLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     loadData(true);

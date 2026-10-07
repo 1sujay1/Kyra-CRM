@@ -30,42 +30,44 @@ export function AppSidebar({
   const pathname = usePathname();
 
   // Core operational menu: Leads, Meta Campaigns, Visitor Logs, Farmland Projects, Site Visits, Bookings
+  const allRoles: UserRole[] = ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'];
+
   const navItems = [
     {
       title: 'Leads Pipeline',
       href: '/leads',
       icon: Users,
-      roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
+      roles: allRoles,
     },
     {
       title: 'Meta Campaigns',
       href: '/meta-leads',
       icon: Megaphone,
-      roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
+      roles: allRoles,
     },
     {
       title: 'Visitor Logs',
       href: '/visitors',
       icon: Globe,
-      roles: ['admin', 'manager', 'sales_executive', 'digital_marketing'],
+      roles: ['admin'], // STRICT: Only Admin can access Visitor Logs
     },
     {
       title: 'Farmland Projects',
       href: '/projects',
       icon: Trees,
-      roles: ['admin', 'manager', 'sales_executive', 'channel_partner', 'digital_marketing'],
+      roles: allRoles,
     },
     {
       title: 'Site Visits',
       href: '/site-visits',
       icon: CalendarCheck,
-      roles: ['admin', 'manager', 'sales_executive', 'digital_marketing'],
+      roles: allRoles,
     },
     {
       title: 'Bookings',
       href: '/bookings',
       icon: CreditCard,
-      roles: ['admin', 'manager', 'sales_executive', 'digital_marketing'],
+      roles: allRoles,
     },
   ];
 

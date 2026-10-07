@@ -836,17 +836,17 @@ export default function LeadsPage() {
                       title="Select / Deselect all visible leads"
                     />
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-2">Buyer</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Contact</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Project Name</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Source / Channel</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Budget & Fit</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Quality</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-2 min-w-[200px]">Buyer</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[130px]">Contact</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[150px]">Project Name</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[130px]">Source / Channel</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[110px]">Budget & Fit</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[90px]">Quality</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[160px]">
                     Status <span className="text-[10px] font-normal text-slate-400">(Click to Advance)</span>
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Executive</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 text-right pr-5">Actions</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[110px]">Executive</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 text-right pr-5 min-w-[110px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 

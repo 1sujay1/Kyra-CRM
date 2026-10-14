@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { LeadDetailed } from '@/components/leads/lead-360-drawer';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
 import { sendLeadEmailNotification } from '@/lib/email/nodemailer';
+import { triggerVobizOutboundCall } from '@/lib/voice/vobiz';
 
 // GET: Meta Webhook verification handshake or health status
 export async function GET(req: NextRequest) {
@@ -278,6 +279,20 @@ export async function POST(req: NextRequest) {
       console.log('[Webhook API] Email dispatch result:', emailResult);
     } catch (mailErr) {
       console.error('[Webhook API] Email dispatch exception:', mailErr);
+    }
+
+    // Trigger Instant Vobiz AI Voice Call to Lead
+    try {
+      triggerVobizOutboundCall({
+        lead_id: newLead.id,
+        full_name: newLead.full_name,
+        phone: newLead.phone,
+        project_name: newLead.project_name,
+      })
+        .then((voiceRes) => console.log('[Webhook API] Vobiz Voice call dispatch result:', voiceRes))
+        .catch((voiceErr) => console.error('[Webhook API] Vobiz Voice call dispatch exception:', voiceErr));
+    } catch (voiceErr) {
+      console.error('[Webhook API] Vobiz Voice call notice:', voiceErr);
     }
 
     return NextResponse.json({

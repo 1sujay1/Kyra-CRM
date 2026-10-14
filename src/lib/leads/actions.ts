@@ -5,6 +5,7 @@ import { getCurrentUserAction } from '@/lib/auth/actions';
 import { LeadDetailed, ActivityItem, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
 import { LeadStatusType } from '@/components/leads/status-change-modal';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
+import { triggerVobizOutboundCall } from '@/lib/voice/vobiz';
 
 // Fetch all leads directly from MongoDB database
 export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
@@ -194,6 +195,18 @@ export async function createLeadAction(newLead: LeadDetailed): Promise<{ success
         created_at: act.created_at || new Date().toISOString(),
       }));
       await db.collection('activities').insertMany(activityDocs);
+    }
+
+    // Trigger Instant Vobiz AI Voice Call to Lead
+    try {
+      triggerVobizOutboundCall({
+        lead_id: newLead.id,
+        full_name: newLead.full_name,
+        phone: newLead.phone,
+        project_name: newLead.project_name,
+      }).catch((voiceErr) => console.warn('[createLeadAction] Vobiz Voice notice:', voiceErr));
+    } catch {
+      // non-blocking
     }
 
     return { success: true };

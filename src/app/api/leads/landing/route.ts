@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
 import { sendLeadEmailNotification } from '@/lib/email/nodemailer';
+import { triggerVobizOutboundCall } from '@/lib/voice/vobiz';
 
 // Helper CORS headers for cross-origin landing page requests
 function corsHeaders() {
@@ -174,6 +175,17 @@ export async function POST(req: NextRequest) {
     })
       .then((res) => console.log('✅ [CRM Landing API Step 6 SUCCESS] Email notification dispatched:', res))
       .catch((mailErr) => console.error('❌ [CRM Landing API Step 6 FAILURE] Email notification exception:', mailErr));
+
+    // Trigger Instant Vobiz AI Voice Call to Lead
+    console.log('🎙️ [CRM Landing API Step 6c] Triggering Vobiz AI Voice call async...');
+    triggerVobizOutboundCall({
+      lead_id: newLeadId,
+      full_name: fullName,
+      phone: savedPhone,
+      project_name: projectName,
+    })
+      .then((voiceRes) => console.log('✅ [CRM Landing API Step 6c SUCCESS] Vobiz Voice call dispatched:', voiceRes))
+      .catch((voiceErr) => console.error('❌ [CRM Landing API Step 6c FAILURE] Vobiz Voice call exception:', voiceErr));
 
     console.log('🎉 [CRM Landing API Step 7] Responding HTTP 200 OK to client.');
 

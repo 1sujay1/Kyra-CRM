@@ -43,10 +43,26 @@ async function handleInboundCall(req: NextRequest) {
   const callInfo = await extractCallParams(req);
   console.log('📞 [Vobiz Inbound Webhook] Incoming call event:', callInfo);
 
-  // Default Kyra Group contact numbers
-  // Vobiz requires callerId to match the account's purchased virtual number (+918064264233)
-  const virtualNumber = (process.env.VOBIZ_VIRTUAL_NUMBER || '+918064264233').trim();
-  const forwardToNumber = (process.env.VOBIZ_FORWARD_TO_NUMBER || '+919087266613').trim();
+  // 1. Destination mobile number to forward to
+  // Prioritize URL query param (e.g. ?forward_to=+919008539579), then .env, then default to +919008539579
+  const rawForward = (
+    callInfo.raw?.forward_to ||
+    callInfo.raw?.to_number ||
+    callInfo.raw?.forward ||
+    process.env.VOBIZ_FORWARD_TO_NUMBER ||
+    '+919008539579'
+  ).toString().trim();
+
+  // Normalize to E.164
+  let cleanForwardDigits = rawForward.replace(/\D/g, '');
+  if (cleanForwardDigits.length === 10) cleanForwardDigits = `91${cleanForwardDigits}`;
+  const forwardToNumber = `+${cleanForwardDigits}`;
+
+  // 2. Caller ID must be the purchased Vobiz virtual number (+918064264233)
+  const rawVirtual = (process.env.VOBIZ_VIRTUAL_NUMBER || '+918064264233').trim();
+  let cleanVirtualDigits = rawVirtual.replace(/\D/g, '');
+  if (cleanVirtualDigits.length === 10) cleanVirtualDigits = `91${cleanVirtualDigits}`;
+  const virtualNumber = `+${cleanVirtualDigits}`;
 
   // Async non-blocking log to MongoDB
   try {

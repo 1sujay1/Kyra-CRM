@@ -57,6 +57,7 @@ import {
   updateLeadStatusAction,
   createLeadAction,
   deleteLeadAction,
+  initiateClickToCallAction,
 } from '@/lib/leads/actions';
 import { getCurrentUserAction } from '@/lib/auth/actions';
 
@@ -117,6 +118,48 @@ export default function LeadsPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  // Click-to-Call State
+  const [callingLeadId, setCallingLeadId] = useState<string | null>(null);
+  const [callBanner, setCallBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleQuickCall = async (e: React.MouseEvent, lead: LeadDetailed) => {
+    e.stopPropagation();
+    setCallingLeadId(lead.id);
+    setCallBanner({
+      type: 'success',
+      message: `Dialing agent phone (+91 90085 39579)... Please pick up to connect to ${lead.full_name}.`,
+    });
+
+    try {
+      const res = await initiateClickToCallAction({
+        leadId: lead.id,
+        leadName: lead.full_name,
+        leadPhone: lead.phone,
+      });
+
+      if (res.success) {
+        setCallBanner({
+          type: 'success',
+          message: `📞 Call connected to ${res.agentPhone || 'your phone'}! Answer your phone to bridge with ${lead.full_name} (${lead.phone}). Call will be recorded & transcribed.`,
+        });
+        // Refresh leads in 6 seconds to show the logged activity
+        setTimeout(() => loadData(false), 6000);
+      } else {
+        setCallBanner({
+          type: 'error',
+          message: `⚠️ Call failed: ${res.error || 'Could not place call'}`,
+        });
+      }
+    } catch (err: any) {
+      setCallBanner({
+        type: 'error',
+        message: `⚠️ Call error: ${err?.message || 'Call failed'}`,
+      });
+    } finally {
+      setCallingLeadId(null);
+    }
+  };
 
   // Load leads from server & database
   const loadData = useCallback(async (showLoadingSpinner = false) => {
@@ -1095,7 +1138,23 @@ export default function LeadsPage() {
 
                         {/* 9. Actions */}
                         <TableCell className="py-3 pr-5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => handleQuickCall(e, lead)}
+                              disabled={callingLeadId === lead.id}
+                              className="h-8 px-2.5 text-xs text-emerald-800 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900 font-semibold gap-1 rounded-lg shadow-2xs cursor-pointer transition-all disabled:opacity-50"
+                              title="Click to Call lead via Vobiz Bangalore landline (+918064264233)"
+                            >
+                              {callingLeadId === lead.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-700" />
+                              ) : (
+                                <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+                              )}
+                              <span>{callingLeadId === lead.id ? 'Dialing...' : 'Call'}</span>
+                            </Button>
+
                             <Button
                               size="sm"
                               onClick={() => handleOpen360(lead)}
@@ -1270,6 +1329,45 @@ export default function LeadsPage() {
                 )}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Click-to-Call Status Notification */}
+      {callBanner && (
+        <div className="fixed top-6 right-6 z-50 max-w-md w-full animate-in fade-in slide-in-from-top-4 duration-300">
+          <div
+            className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex items-start justify-between gap-3 ${
+              callBanner.type === 'error'
+                ? 'bg-rose-950/95 border-rose-500/80 text-rose-100 shadow-rose-950/50'
+                : 'bg-slate-900/95 border-emerald-500/80 text-white shadow-emerald-950/50'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2 rounded-xl mt-0.5 ${
+                  callBanner.type === 'error' ? 'bg-rose-900/60 text-rose-200' : 'bg-emerald-500/20 text-emerald-400'
+                }`}
+              >
+                {callBanner.type === 'error' ? (
+                  <AlertCircle className="h-5 w-5" />
+                ) : (
+                  <PhoneCall className="h-5 w-5 animate-bounce" />
+                )}
+              </div>
+              <div className="space-y-0.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  {callBanner.type === 'error' ? 'Call Failed' : 'Vobiz Call Initiated'}
+                </h4>
+                <p className="text-xs text-slate-200 leading-relaxed font-medium">{callBanner.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setCallBanner(null)}
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}

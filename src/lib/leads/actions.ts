@@ -5,7 +5,7 @@ import { getCurrentUserAction } from '@/lib/auth/actions';
 import { LeadDetailed, ActivityItem, StatusHistoryItem } from '@/components/leads/lead-360-drawer';
 import { LeadStatusType } from '@/components/leads/status-change-modal';
 import { validateIndianPhoneNumber, getCorePhoneDigits } from '@/lib/security/phone';
-import { triggerVobizOutboundCall } from '@/lib/voice/vobiz';
+import { triggerVobizOutboundCall, initiateClickToCall } from '@/lib/voice/vobiz';
 
 // Fetch all leads directly from MongoDB database
 export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
@@ -60,6 +60,12 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
           type: act.type || 'note',
           outcome: act.outcome || '',
           notes: act.notes || '',
+          recording_url: act.recording_url || undefined,
+          duration_seconds: act.duration_seconds || undefined,
+          transcript: act.transcript || undefined,
+          summary: act.summary || undefined,
+          direction: act.direction || undefined,
+          call_uuid: act.call_uuid || undefined,
           created_by: act.created_by || 'System',
           created_at: act.created_at,
         }))
@@ -306,3 +312,53 @@ export async function deleteLeadAction(leadId: string): Promise<{ success: boole
     return { success: false, error: err?.message || 'Failed to delete lead from MongoDB.' };
   }
 }
+
+/**
+ * 2-Legged Click-to-Call Server Action:
+ * Bridges agent and lead using Vobiz Virtual Bangalore Landline (+918064264233)
+ */
+export async function initiateClickToCallAction(payload: {
+  leadId: string;
+  leadName: string;
+  leadPhone: string;
+  agentPhone?: string;
+}): Promise<{ success: boolean; callUuid?: string; agentPhone?: string; error?: string }> {
+  try {
+    const user = await getCurrentUserAction();
+    const destinationAgentPhone = payload.agentPhone || (user as any)?.phone || process.env.VOBIZ_FORWARD_TO_NUMBER || '+919008539579';
+
+    const result = await initiateClickToCall({
+      leadId: payload.leadId,
+      leadName: payload.leadName,
+      leadPhone: payload.leadPhone,
+      agentPhone: destinationAgentPhone,
+    });
+
+    if (result.success) {
+      try {
+        const db = await getDatabase();
+        await db.collection('activities').insertOne({
+          id: `act-call-${Date.now()}`,
+          lead_id: payload.leadId,
+          type: 'call',
+          outcome: 'Click-to-Call Dialed',
+          notes: `Agent initiated bridged call via Vobiz virtual number (+918064264233) to ${payload.leadName} (${payload.leadPhone}). Destination agent phone: ${result.agentPhone || destinationAgentPhone}.`,
+          direction: 'outbound',
+          call_uuid: result.callUuid,
+          created_by: user?.username || 'Current Agent',
+          created_at: new Date().toISOString(),
+        });
+      } catch (logErr) {
+        console.warn('⚠️ [initiateClickToCallAction] Activity log warning:', logErr);
+      }
+    }
+
+    return result;
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Failed to initiate click-to-call',
+    };
+  }
+}
+

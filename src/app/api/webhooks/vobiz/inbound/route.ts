@@ -87,9 +87,14 @@ async function handleInboundCall(req: NextRequest) {
     // Non-blocking
   }
 
-  // Generate Vobiz XML to bridge/forward the call to the real mobile number
+  // Recording Callback URL (note XML ampersand encoding &amp;)
+  const appUrl = (process.env.APP_URL || 'https://crm.kyragroupindia.com').replace(/\/+$/, '');
+  const recordingCallbackUrl = `${appUrl}/api/webhooks/vobiz/recording?direction=inbound&amp;caller=${encodeURIComponent(callInfo.from)}&amp;call_uuid=${encodeURIComponent(callInfo.callUuid)}`;
+
+  // Generate Vobiz XML to record and bridge/forward the call to the real mobile number
   const xmlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+    <Record fileFormat="mp3" recordSession="true" maxLength="3600" callbackUrl="${recordingCallbackUrl}" redirect="false" playBeep="false"/>
     <Dial callerId="${virtualNumber}">
         <Number>${forwardToNumber}</Number>
     </Dial>

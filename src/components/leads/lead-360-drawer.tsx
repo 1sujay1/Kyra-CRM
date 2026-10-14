@@ -28,9 +28,13 @@ import {
   Save,
   Tag,
   History,
+  Sparkles,
+  Volume2,
+  Loader2,
 } from 'lucide-react';
 import { LeadStatusType } from './status-change-modal';
 import { createSiteVisitAction } from '@/lib/site-visits/actions';
+import { initiateClickToCallAction } from '@/lib/leads/actions';
 
 export interface StatusHistoryItem {
   id: string;
@@ -46,6 +50,12 @@ export interface ActivityItem {
   type: 'call' | 'whatsapp' | 'meeting' | 'note' | 'site_visit';
   outcome?: string;
   notes: string;
+  recording_url?: string;
+  duration_seconds?: number;
+  transcript?: string;
+  summary?: string;
+  direction?: 'inbound' | 'outbound';
+  call_uuid?: string;
   created_by: string;
   created_at: string;
 }
@@ -118,6 +128,46 @@ export function Lead360Drawer({
     pickup_location: 'Coimbatore International Airport (CJB)',
     notes: '',
   });
+
+  // Click-to-Call state
+  const [isCalling, setIsCalling] = useState(false);
+  const [callAlert, setCallAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleInitiateCall = async () => {
+    if (!lead) return;
+    setIsCalling(true);
+    setCallAlert({
+      type: 'success',
+      message: `Dialing your phone first (+91 90085 39579)... Please pick up to connect to ${lead.full_name}.`,
+    });
+
+    try {
+      const res = await initiateClickToCallAction({
+        leadId: lead.id,
+        leadName: lead.full_name,
+        leadPhone: lead.phone,
+      });
+
+      if (res.success) {
+        setCallAlert({
+          type: 'success',
+          message: `📞 Call connected to ${res.agentPhone || 'your phone'}! Pick up your phone to bridge with ${lead.full_name} (${lead.phone}). Call will be recorded & transcribed.`,
+        });
+      } else {
+        setCallAlert({
+          type: 'error',
+          message: `⚠️ Call failed: ${res.error || 'Could not place call'}`,
+        });
+      }
+    } catch (err: any) {
+      setCallAlert({
+        type: 'error',
+        message: `⚠️ Call error: ${err?.message || 'Failed to place call'}`,
+      });
+    } finally {
+      setIsCalling(false);
+    }
+  };
 
   // Sync formData when lead changes
   React.useEffect(() => {
@@ -269,8 +319,22 @@ export function Lead360Drawer({
 
             <div className="flex items-center gap-2">
               <button
+                onClick={handleInitiateCall}
+                disabled={isCalling}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-slate-900 transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
+                title="Place bridged call to lead via Vobiz Bangalore landline (+918064264233)"
+              >
+                {isCalling ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-900" />
+                ) : (
+                  <PhoneCall className="h-3.5 w-3.5 text-slate-900" />
+                )}
+                <span>{isCalling ? 'Dialing...' : 'Call Now'}</span>
+              </button>
+
+              <button
                 onClick={onOpenStatusModal}
-                className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-xs font-semibold text-emerald-100 border border-emerald-600 transition-colors flex items-center gap-1.5 shadow-sm"
+                className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-xs font-semibold text-emerald-100 border border-emerald-600 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <span>Status:</span>
                 <span className="uppercase text-[11px] underline tracking-wider font-bold">
@@ -279,6 +343,28 @@ export function Lead360Drawer({
               </button>
             </div>
           </div>
+
+          {/* Click-to-call notification banner */}
+          {callAlert && (
+            <div
+              className={`mt-3 p-3 rounded-xl text-xs flex items-center justify-between border ${
+                callAlert.type === 'error'
+                  ? 'bg-rose-950/80 border-rose-500/80 text-rose-200'
+                  : 'bg-emerald-950/90 border-emerald-500/80 text-emerald-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm shrink-0">{callAlert.type === 'error' ? '⚠️' : '📞'}</span>
+                <span className="leading-snug">{callAlert.message}</span>
+              </div>
+              <button
+                onClick={() => setCallAlert(null)}
+                className="text-xs opacity-70 hover:opacity-100 px-1.5 py-0.5 rounded hover:bg-white/10 shrink-0 ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Quick Badges Row */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 pt-4 border-t border-emerald-800/80 text-xs">
@@ -420,15 +506,17 @@ export function Lead360Drawer({
                     {lead.activities.map((act) => (
                       <div
                         key={act.id}
-                        className="p-3.5 rounded-xl border border-slate-200 bg-white flex flex-col gap-1 text-xs shadow-sm"
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white flex flex-col gap-1.5 text-xs shadow-sm hover:border-slate-300 transition-colors"
                       >
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="capitalize text-[10px]">
-                              {act.type.replace('_', ' ')}
+                            <Badge variant="outline" className={`capitalize text-[10px] ${
+                              act.type === 'call' ? 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold' : ''
+                            }`}>
+                              {act.direction ? `${act.direction} call` : act.type.replace('_', ' ')}
                             </Badge>
                             {act.outcome && (
-                              <span className="font-semibold text-slate-700">{act.outcome}</span>
+                              <span className="font-semibold text-slate-800">{act.outcome}</span>
                             )}
                           </div>
                           <span className="text-[11px] text-muted-foreground">
@@ -438,9 +526,69 @@ export function Lead360Drawer({
                             })}
                           </span>
                         </div>
-                        <p className="text-slate-700 mt-1">{act.notes}</p>
-                        <span className="text-[10px] text-muted-foreground text-right">
-                          By: {act.created_by}
+
+                        {/* Audio Player for Call Recordings */}
+                        {act.recording_url && (
+                          <div className="mt-2 p-3 rounded-xl bg-slate-900 text-white shadow-sm border border-slate-800">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="text-xs font-semibold text-slate-100 flex items-center gap-1.5">
+                                  <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                                  <span>Call Recording ({act.direction === 'outbound' ? 'Outbound' : 'Inbound'})</span>
+                                </span>
+                              </div>
+                              {act.duration_seconds ? (
+                                <span className="text-[10px] font-mono bg-slate-800 text-emerald-300 px-2 py-0.5 rounded border border-slate-700">
+                                  {Math.floor(act.duration_seconds / 60)}m {act.duration_seconds % 60}s
+                                </span>
+                              ) : null}
+                            </div>
+                            <audio
+                              controls
+                              preload="metadata"
+                              src={act.recording_url}
+                              className="w-full h-8 rounded accent-emerald-500"
+                            />
+                          </div>
+                        )}
+
+                        {/* AI Call Summary Card */}
+                        {act.summary && (
+                          <div className="mt-2 p-3 rounded-xl bg-gradient-to-br from-indigo-50/90 via-purple-50/60 to-blue-50/80 border border-indigo-200/90 text-xs shadow-2xs">
+                            <div className="flex items-center gap-1.5 font-bold text-indigo-900 mb-1.5">
+                              <Sparkles className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
+                              <span>AI Call Summary & Action Items</span>
+                            </div>
+                            <div className="text-indigo-950 whitespace-pre-line text-[11px] leading-relaxed">
+                              {act.summary}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Collapsible Full Transcript */}
+                        {act.transcript && (
+                          <details className="mt-1 text-xs group">
+                            <summary className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1 flex items-center gap-1.5">
+                              <FileText className="h-3 w-3 text-slate-400" />
+                              <span>View Full Speech-to-Text Transcript</span>
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                ({act.transcript.split(/\s+/).length} words)
+                              </span>
+                            </summary>
+                            <div className="mt-1.5 p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-700 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                              {act.transcript}
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Notes if not already displayed as summary */}
+                        {(!act.summary || !act.notes.includes(act.summary)) && (
+                          <p className="text-slate-700 mt-1">{act.notes}</p>
+                        )}
+
+                        <span className="text-[10px] text-muted-foreground text-right mt-0.5">
+                          Logged by: {act.created_by}
                         </span>
                       </div>
                     ))}

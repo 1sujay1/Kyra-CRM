@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar, Car, Clock, User, Phone, MapPin, Loader2, Sparkles } from 'lucide-react';
 import { createSiteVisitAction, SiteVisitItem } from '@/lib/site-visits/actions';
+import { fetchExecutivesAction } from '@/lib/executives/actions';
 
 interface ScheduleVisitModalProps {
   isOpen: boolean;
@@ -57,11 +58,22 @@ export function ScheduleVisitModal({
   const [pickupLocation, setPickupLocation] = useState<string>('Coimbatore International Airport (CJB)');
   const [driverName, setDriverName] = useState<string>('');
   const [vehicleNumber, setVehicleNumber] = useState<string>('');
-  const [assignedExecutive, setAssignedExecutive] = useState<string>('Priya Raman');
+  const [assignedExecutive, setAssignedExecutive] = useState<string>('Unassigned');
+  const [executivesList, setExecutivesList] = useState<{ id: string; name: string; designation?: string }[]>([]);
   const [plotsShown, setPlotsShown] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchExecutivesAction().then((items) => {
+        if (Array.isArray(items)) {
+          setExecutivesList(items.filter((e) => e.is_active));
+        }
+      });
+    }
+  }, [isOpen]);
 
   // Auto-fill when preselectedLead is passed or modal opens
   React.useEffect(() => {
@@ -304,10 +316,12 @@ export function ScheduleVisitModal({
                 onChange={(e) => setAssignedExecutive(e.target.value)}
                 className="w-full text-xs h-9 rounded-md border border-input bg-white px-3"
               >
-                <option value="Priya Raman">Priya Raman (Senior Farm Specialist)</option>
-                <option value="Vignesh Kumar">Vignesh Kumar (Project Manager)</option>
-                <option value="Suresh Balaji">Suresh Balaji (Farmland Consultant)</option>
-                <option value="Karthik Raj">Karthik Raj (Field Executive)</option>
+                <option value="Unassigned">Unassigned</option>
+                {executivesList.map((exec) => (
+                  <option key={exec.id} value={exec.name}>
+                    {exec.name} {exec.designation ? `(${exec.designation})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-1.5">

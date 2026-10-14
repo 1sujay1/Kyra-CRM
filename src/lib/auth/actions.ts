@@ -78,12 +78,15 @@ export async function loginAction(identifierRaw: string, passwordRaw: string): P
   try {
     const db = await getDatabase();
     
-    // Query by username or email
+    // Query by username, email, aliases, or role prefix
     const userDoc = await db.collection('users').findOne({
       $or: [
         { username: { $regex: new RegExp(`^${identifier}$`, 'i') } },
         { email: { $regex: new RegExp(`^${targetEmail}$`, 'i') } },
         { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+        { aliases: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+        ...(identifier.toLowerCase() === 'admin' ? [{ role: 'admin' }] : []),
+        ...(identifier.toLowerCase() === 'digital' ? [{ role: 'digital_marketing' }] : []),
       ],
     });
 
@@ -262,3 +265,72 @@ function formatRelativeTime(dateStr: string): string {
     return 'Recently';
   }
 }
+
+/**
+ * Change user password securely
+ */
+export async function changePasswordAction(
+  currentPasswordRaw: string,
+  newPasswordRaw: string
+): Promise<{ success: boolean; error?: string }> {
+  const currentPassword = currentPasswordRaw.trim();
+  const newPassword = newPasswordRaw.trim();
+
+  if (!currentPassword || !newPassword) {
+    return { success: false, error: 'Current password and new password are required.' };
+  }
+
+  if (newPassword.length < 6) {
+    return { success: false, error: 'New password must be at least 6 characters long.' };
+  }
+
+  const currentUser = await getCurrentUserAction();
+  if (!currentUser) {
+    return { success: false, error: 'You must be logged in to change your password.' };
+  }
+
+  try {
+    const db = await getDatabase();
+    const userDoc = await db.collection('users').findOne({
+      $or: [
+        { username: { $regex: new RegExp(`^${currentUser.username}$`, 'i') } },
+        { email: { $regex: new RegExp(`^${currentUser.email}$`, 'i') } },
+      ],
+    });
+
+    if (!userDoc) {
+      return { success: false, error: 'User account not found.' };
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, userDoc.passwordHash);
+    if (!isValid) {
+      return { success: false, error: 'Incorrect current password.' };
+    }
+
+    const newHashed = await bcrypt.hash(newPassword, 10);
+    await db.collection('users').updateOne(
+      { _id: userDoc._id },
+      {
+        $set: {
+          passwordHash: newHashed,
+          updated_at: new Date().toISOString(),
+        },
+      }
+    );
+
+    // Audit log entry
+    await db.collection('audit_logs').insertOne({
+      user: `${currentUser.username} (${currentUser.role})`,
+      action: 'password_change',
+      entity: 'User account password updated',
+      ip: '127.0.0.1',
+      created_at: new Date().toISOString(),
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Failed to change password:', err);
+    return { success: false, error: err?.message || 'Failed to update password.' };
+  }
+}
+

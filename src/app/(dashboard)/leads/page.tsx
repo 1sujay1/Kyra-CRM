@@ -836,17 +836,17 @@ export default function LeadsPage() {
                       title="Select / Deselect all visible leads"
                     />
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-2">Buyer</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Contact</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Project Name</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Source / Channel</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Budget & Fit</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Quality</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 pl-2 min-w-[200px]">Buyer</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[130px]">Contact</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[150px]">Project Name</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[130px]">Source / Channel</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[110px]">Budget & Fit</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[90px]">Quality</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[160px]">
                     Status <span className="text-[10px] font-normal text-slate-400">(Click to Advance)</span>
                   </TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5">Executive</TableHead>
-                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 text-right pr-5">Actions</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 min-w-[110px]">Executive</TableHead>
+                  <TableHead className="font-bold text-xs text-slate-800 py-3.5 text-right pr-5 min-w-[110px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -943,42 +943,12 @@ export default function LeadsPage() {
                           </div>
                         </TableCell>
 
-                        {/* 2. Phone + Actions (WhatsApp & Copy) */}
+                        {/* 2. Phone */}
                         <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center">
                             <span className="font-mono text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200/60 px-2 py-1 rounded-md">
-                              {isRevealed ? lead.phone : maskPhone(lead.phone)}
+                              {maskPhone(lead.phone)}
                             </span>
-
-                            {/* Eye reveal toggle */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleRevealPhone(e, lead.id)}
-                              className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                              title={isRevealed ? 'Mask phone number' : 'Reveal full phone number'}
-                            >
-                              {isRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                            </button>
-
-                            {/* Copy button */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleCopyPhone(e, lead.id, lead.phone)}
-                              className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                              title="Copy phone to clipboard"
-                            >
-                              {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                            </button>
-
-                            {/* WhatsApp button */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleWhatsAppClick(e, lead.phone)}
-                              className="text-emerald-600 hover:text-emerald-700 p-1 rounded-md hover:bg-emerald-50 transition-colors cursor-pointer"
-                              title="Chat on WhatsApp"
-                            >
-                              <MessageCircle className="h-3.5 w-3.5 fill-emerald-100 text-emerald-600" />
-                            </button>
                           </div>
                         </TableCell>
 
@@ -1112,48 +1082,29 @@ export default function LeadsPage() {
 
                         {/* 8. Executive */}
                         <TableCell className="py-3">
-                          <span className="text-xs text-slate-700 font-medium">
-                            {lead.assigned_to_name}
-                          </span>
+                          {lead.assigned_to_name && lead.assigned_to_name !== 'Unassigned' && lead.assigned_to_name !== 'Priya Raman' ? (
+                            <span className="text-xs text-slate-700 font-medium">
+                              {lead.assigned_to_name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">
+                              Unassigned
+                            </span>
+                          )}
                         </TableCell>
 
                         {/* 9. Actions */}
                         <TableCell className="py-3 pr-5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            {/* Schedule Visit */}
+                          <div className="flex items-center justify-end">
                             <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => handleDirectScheduleVisit(e, lead)}
-                              className="h-8 w-8 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg cursor-pointer transition-colors"
-                              title="Schedule Farmland Site Visit"
-                            >
-                              <CalendarCheck className="h-4 w-4" />
-                            </Button>
-
-                            {/* Open 360 */}
-                            <Button
-                              variant="ghost"
                               size="sm"
                               onClick={() => handleOpen360(lead)}
-                              className="h-8 w-8 p-0 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer transition-colors"
+                              className="h-8 px-3 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-semibold gap-1.5 rounded-lg shadow-xs cursor-pointer transition-all"
                               title="Open Lead 360 View"
                             >
-                              <ArrowUpRight className="h-4 w-4" />
+                              <span>Lead 360</span>
+                              <ArrowUpRight className="h-3.5 w-3.5" />
                             </Button>
-
-                            {/* Delete (Admin Only) */}
-                            {userRole === 'admin' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => handleOpenDeleteModal(e, lead)}
-                                className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
-                                title="Delete Lead from CRM & Database (Admin Only)"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
                           </div>
                         </TableCell>
                       </TableRow>

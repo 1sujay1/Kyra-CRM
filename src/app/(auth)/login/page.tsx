@@ -32,8 +32,9 @@ function LoginForm() {
 
       // Perform direct window navigation to ensure cookies are immediately committed
       window.location.href = '/leads';
-    } catch {
-      setErrorMessage('Server authentication error. Please try again.');
+    } catch (err: any) {
+      console.error('Login action error:', err);
+      setErrorMessage(err?.message || 'Server authentication error. Please try again.');
       setLoading(false);
     }
   };

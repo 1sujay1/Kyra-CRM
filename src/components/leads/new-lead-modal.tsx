@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { normalizeIndianPhone } from '@/lib/security/phone';
 import { LeadDetailed } from './lead-360-drawer';
+import { fetchExecutivesAction } from '@/lib/executives/actions';
 
 interface NewLeadModalProps {
   open: boolean;
@@ -34,9 +35,21 @@ export function NewLeadModal({
   const [purpose, setPurpose] = useState<'investment' | 'farmhouse' | 'agriculture'>('farmhouse');
   const [budget, setBudget] = useState('₹35L - ₹50L');
   const [source, setSource] = useState('manual');
-  const [assignedTo, setAssignedTo] = useState('Priya Raman');
+  const [assignedTo, setAssignedTo] = useState('Unassigned');
+  const [executivesList, setExecutivesList] = useState<{ id: string; name: string }[]>([]);
   const [initialNote, setInitialNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      fetchExecutivesAction().then((items) => {
+        if (Array.isArray(items)) {
+          const activeOnly = items.filter((e) => e.is_active);
+          setExecutivesList(activeOnly);
+        }
+      });
+    }
+  }, [open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,9 +222,12 @@ export function NewLeadModal({
                 onChange={(e) => setAssignedTo(e.target.value)}
                 className="w-full text-xs h-9 rounded-md border border-input bg-transparent px-3"
               >
-                <option value="Priya Raman">Priya Raman</option>
-                <option value="Vignesh Kumar">Vignesh Kumar</option>
-                <option value="Suresh Narayanan">Suresh Narayanan</option>
+                <option value="Unassigned">Unassigned</option>
+                {executivesList.map((exec) => (
+                  <option key={exec.id} value={exec.name}>
+                    {exec.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

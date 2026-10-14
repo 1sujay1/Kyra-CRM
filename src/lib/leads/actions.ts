@@ -102,7 +102,7 @@ export async function fetchLeadsAction(): Promise<LeadDetailed[]> {
         purpose: l.purpose || 'farmhouse',
         status: l.status || 'new',
         quality: l.quality || 'warm',
-        assigned_to_name: l.assigned_to_name || 'Priya Raman',
+        assigned_to_name: l.assigned_to_name || 'Unassigned',
         created_at: l.created_at,
         scheduled_visit_date: scheduledVisitDate,
         status_history: dbHistory,

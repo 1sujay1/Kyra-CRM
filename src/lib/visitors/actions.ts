@@ -24,6 +24,11 @@ export interface VisitorLogItem {
 }
 
 export async function fetchVisitorLogsAction(): Promise<VisitorLogItem[]> {
+  const user = await getCurrentUserAction();
+  if (!user || user.role !== 'admin') {
+    return [];
+  }
+
   try {
     const db = await getDatabase();
     const rawLogs = await db

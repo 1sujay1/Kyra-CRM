@@ -1,4 +1,5 @@
 import { getCorePhoneDigits } from '@/lib/security/phone';
+import { getDatabase } from '@/lib/mongodb';
 
 export interface VobizCallPayload {
   lead_id?: string;
@@ -16,11 +17,25 @@ export interface ClickToCallPayload {
 
 /**
  * Trigger an instant automated outbound Vobiz AI Voice Call announcement to a lead
+ * Controlled by VOBIZ_AUTO_CALL_ENABLED (default: true)
+ * Message configurable via VOBIZ_AUTO_CALL_MESSAGE
  */
 export async function triggerVobizOutboundCall(
   payload: VobizCallPayload
 ): Promise<{ success: boolean; callUuid?: string; error?: string }> {
   try {
+    // 1. Feature Flag: Enable/Disable automated outbound AI Voice Call on lead submission (default: true)
+    const rawFlag = (process.env.VOBIZ_AUTO_CALL_ENABLED || 'true').trim().toLowerCase();
+    const isAutoCallEnabled = rawFlag !== 'false' && rawFlag !== '0' && rawFlag !== 'disabled' && rawFlag !== 'no';
+
+    if (!isAutoCallEnabled) {
+      console.log(`ℹ️ [Vobiz Voice] Automated outbound call skipped for ${payload.full_name} (${payload.phone}): VOBIZ_AUTO_CALL_ENABLED is disabled.`);
+      return {
+        success: false,
+        error: 'Automated AI call is disabled by environment configuration (VOBIZ_AUTO_CALL_ENABLED=false).',
+      };
+    }
+
     const authId = process.env.VOBIZ_AUTH_ID?.trim() || 'MA_PE6KXF2X';
     const authToken = process.env.VOBIZ_AUTH_TOKEN?.trim() || 'iI9VJh6UtLxhtaFW0JDUT5C90JSegKqTI2nlfx3WqrTijZa3UIKy1X1OEe5KjWmm';
     const rawVirtual = process.env.VOBIZ_VIRTUAL_NUMBER?.trim() || '+918064264233';
@@ -37,10 +52,10 @@ export async function triggerVobizOutboundCall(
     }
 
     const targetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-    const answerUrl = `${appUrl}/api/webhooks/vobiz/answer?name=${encodeURIComponent(payload.full_name || 'Valued Customer')}&project=${encodeURIComponent(payload.project_name || 'Kyra Farmlands')}`;
+    const answerUrl = `${appUrl}/api/webhooks/vobiz/answer?name=${encodeURIComponent(payload.full_name || 'Valued Customer')}&project=${encodeURIComponent(payload.project_name || 'Kyra Farmlands')}&lead_id=${encodeURIComponent(payload.lead_id || '')}`;
     const makeCallUrl = `https://api.vobiz.ai/api/v1/Account/${authId}/Call/make_call`;
 
-    console.log(`📡 [Vobiz Voice Step 2] Triggering outbound announcement call to ${targetPhone}...`);
+    console.log(`📡 [Vobiz Voice Step 2] Triggering automated outbound announcement call to ${targetPhone}...`);
     console.log(`🔗 Answer Webhook URL: ${answerUrl}`);
 
     const response = await fetch(makeCallUrl, {
@@ -63,6 +78,32 @@ export async function triggerVobizOutboundCall(
 
     if (response.ok && (resJson.call_uuid || resJson.status === 'success' || resJson.message === 'call_created')) {
       console.log(`✅ [Vobiz Voice Step 4 SUCCESS] Outbound call initiated for ${payload.full_name} (${targetPhone}). CallUUID: ${resJson.call_uuid || 'N/A'}`);
+
+      // Log activity in MongoDB
+      if (payload.lead_id) {
+        try {
+          const db = await getDatabase();
+          const defaultMsg = 'Hello {name}, thanks for your interest with Kyra Group! Our executive will connect with you shortly.';
+          const msgTemplate = (process.env.VOBIZ_AUTO_CALL_MESSAGE || defaultMsg)
+            .replace(/\{name\}/gi, payload.full_name || 'Valued Customer')
+            .replace(/\{project\}/gi, payload.project_name || 'Kyra Farmlands');
+
+          await db.collection('activities').insertOne({
+            id: `act-call-init-${Date.now()}`,
+            lead_id: payload.lead_id,
+            type: 'call',
+            outcome: 'Automated AI Welcome Call Dispatched',
+            notes: `Automated AI Voice call placed to ${targetPhone} via virtual number (${cleanVirtual}). Script: "${msgTemplate}"`,
+            direction: 'outbound',
+            call_uuid: resJson.call_uuid,
+            created_by: 'Vobiz Auto-Call Bot',
+            created_at: new Date().toISOString(),
+          });
+        } catch (dbErr) {
+          console.warn('[triggerVobizOutboundCall] Activity log notice:', dbErr);
+        }
+      }
+
       return {
         success: true,
         callUuid: resJson.call_uuid,

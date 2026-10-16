@@ -25,8 +25,6 @@ async function ensureCollectionsExist(db: Db) {
       'projects',
       'plots',
       'site_visits',
-      'activities',
-      'lead_status_history',
       'webhook_logs',
       'user_logins',
       'audit_logs',
